@@ -50,7 +50,16 @@ document.addEventListener('alpine:init', () => {
                 const cached = localStorage.getItem('ag_data_cache');
                 if (cached) {
                     const data = JSON.parse(cached);
-                    // Basic validty check
+                    const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+                    // Check TTL
+                    if (data.timestamp && (Date.now() - data.timestamp > CACHE_TTL)) {
+                        console.log('Cache expired, skipping restoration');
+                        localStorage.removeItem('ag_data_cache');
+                        return;
+                    }
+
+                    // Basic validity check
                     if (data.accounts && data.models) {
                         this.accounts = data.accounts;
                         this.models = data.models;
