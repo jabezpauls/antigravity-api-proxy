@@ -395,6 +395,91 @@ For macOS users who prefer a native experience, there's a companion menu bar app
 | `/v1/messages`    | POST   | Anthropic Messages API                                                |
 | `/v1/models`      | GET    | List available models                                                 |
 | `/refresh-token`  | POST   | Force token refresh                                                   |
+| `/v1/chat/completions` | POST | **OpenAI-compatible** Chat Completions API                         |
+| `/v1/models/openai` | GET  | List models in OpenAI format                                          |
+
+---
+
+## OpenAI API Compatibility
+
+This proxy also exposes **OpenAI-compatible endpoints**, making it usable with any application that supports the OpenAI API format - including **LangChain**, **Cursor IDE**, **Continue.dev**, and the **OpenAI Python/Node SDKs**.
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/chat/completions` | POST | Chat completions (streaming supported) |
+| `/v1/models/openai` | GET | List available models in OpenAI format |
+
+### Model Mapping
+
+OpenAI model names are automatically mapped to internal models:
+
+| OpenAI Model | Internal Model |
+|--------------|----------------|
+| `gpt-4` | `claude-opus-4-5-thinking` |
+| `gpt-4-turbo` | `claude-opus-4-5-thinking` |
+| `gpt-4o` | `gemini-3-pro-high` |
+| `gpt-3.5-turbo` | `gemini-3-flash` |
+| `o1`, `o1-preview` | `claude-opus-4-5-thinking` |
+| `o1-mini` | `claude-sonnet-4-5-thinking` |
+
+You can also use internal model names directly (e.g., `claude-sonnet-4-5-thinking`).
+
+### Usage with OpenAI SDK
+
+**Python:**
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8080/v1",
+    api_key="your-api-key"  # Generate via WebUI Settings → API Keys
+)
+
+response = client.chat.completions.create(
+    model="gpt-4",  # Maps to claude-opus-4-5-thinking
+    messages=[{"role": "user", "content": "Hello!"}],
+    stream=True
+)
+
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")
+```
+
+**Node.js:**
+
+```javascript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+    baseURL: 'http://localhost:8080/v1',
+    apiKey: 'your-api-key'
+});
+
+const response = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Hello!' }]
+});
+
+console.log(response.choices[0].message.content);
+```
+
+### API Key Management
+
+Generate and manage API keys via the **WebUI**:
+
+1. Open `http://localhost:8080`
+2. Go to **Settings** → **API Keys**
+3. Click **Generate Key** to create a new key
+4. Copy the key immediately (it won't be shown again)
+
+API keys support:
+- Enable/disable individual keys
+- Track usage (request count, last used)
+- Multiple keys for different applications
 
 ---
 
@@ -420,6 +505,7 @@ npm run test:interleaved   # Interleaved thinking
 npm run test:images        # Image processing
 npm run test:caching       # Prompt caching
 npm run test:strategies    # Account selection strategies
+node tests/test-openai-api.cjs  # OpenAI API compatibility
 ```
 
 ---

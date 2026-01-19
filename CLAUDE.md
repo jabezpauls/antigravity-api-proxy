@@ -182,6 +182,11 @@ public/
   - Strategies: `sticky` (cache-optimized), `round-robin` (load-balanced), `hybrid` (smart distribution)
 - **src/auth/**: Authentication including Google OAuth, token extraction, database access, and auto-rebuild of native modules
 - **src/format/**: Format conversion between Anthropic and Google Generative AI formats
+  - **src/format/openai/**: OpenAI API compatibility layer
+    - `model-mapper.js`: Maps OpenAI model names (gpt-4, etc.) to internal models
+    - `request-converter.js`: Converts OpenAI Chat Completions → Anthropic format
+    - `response-converter.js`: Converts Anthropic → OpenAI Chat Completions format
+    - `streaming-adapter.js`: Transforms Anthropic SSE events to OpenAI SSE format
 - **src/constants.js**: API endpoints, model mappings, fallback config, OAuth config, and all configuration values
 - **src/modules/usage-stats.js**: Tracks request volume by model/family, persists 30-day history to JSON, and auto-prunes old data.
 - **src/fallback-config.js**: Model fallback mappings (`getFallbackModel()`, `hasFallback()`)
@@ -343,6 +348,11 @@ Each account object in `accounts.json` contains:
 - `/api/logs/stream` - SSE endpoint for real-time logs
 - `/api/stats/history` - Retrieve 30-day request history (sorted chronologically)
 - `/api/auth/url` - Generate Google OAuth URL
+- `/api/keys` - API key management (list, create, update, delete)
+  - `GET /api/keys` - List all keys (masked for display)
+  - `POST /api/keys` - Generate new key (returns full key once)
+  - `PATCH /api/keys/:id` - Update key (name, enabled)
+  - `DELETE /api/keys/:id` - Delete key
 - `/account-limits` - Fetch account quotas and subscription data
   - Returns: `{ accounts: [{ email, subscription: { tier, projectId }, limits: {...} }], models: [...] }`
   - Query params: `?format=table` (ASCII table) or `?includeHistory=true` (adds usage stats)

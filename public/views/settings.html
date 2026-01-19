@@ -57,6 +57,16 @@
                     </svg>
                     <span x-text="$store.global.t('tabServer')">Server</span>
                 </button>
+                <button @click="activeTab = 'apikeys'"
+                    class="pb-3 border-b-2 transition-colors font-medium text-sm flex items-center gap-2 whitespace-nowrap"
+                    :class="activeTab === 'apikeys' ? 'border-neon-purple text-white' : 'border-transparent text-gray-500 hover:text-gray-300'">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                    <span>API Keys</span>
+                </button>
             </div>
         </div>
 
@@ -1267,7 +1277,7 @@
                         changes are saved automatically. Some settings may require server restart.</span>
                 </div>
 
-                <!-- Password Dialog -->
+                <!-- Password Dialog (Server Tab) -->
                 <div x-show="passwordDialog.show"
                     class="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]"
                     @click.self="hidePasswordDialog()" x-cloak>
@@ -1318,6 +1328,231 @@
                             <button class="btn btn-sm bg-neon-purple hover:bg-purple-600 border-none text-white"
                                 @click="changePassword()" x-text="$store.global.t('changePassword')">
                                 Change Password
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 5: API Keys -->
+            <div x-show="activeTab === 'apikeys'" x-data="{
+                keys: [],
+                loading: true,
+                newKeyName: '',
+                generatedKey: null,
+                showDialog: false,
+                async loadKeys() {
+                    this.loading = true;
+                    try {
+                        const res = await fetch('/api/keys');
+                        const data = await res.json();
+                        this.keys = data.keys || [];
+                    } catch (e) {
+                        console.error('Failed to load API keys:', e);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                async generateKey() {
+                    if (!this.newKeyName.trim()) {
+                        this.newKeyName = 'Unnamed Key';
+                    }
+                    try {
+                        const res = await fetch('/api/keys', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: this.newKeyName })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'ok') {
+                            this.generatedKey = data.key.key;
+                            this.showDialog = true;
+                            this.newKeyName = '';
+                            await this.loadKeys();
+                        }
+                    } catch (e) {
+                        console.error('Failed to generate API key:', e);
+                        $store.global.showToast('Failed to generate API key', 'error');
+                    }
+                },
+                async toggleKey(id, enabled) {
+                    try {
+                        await fetch(`/api/keys/${id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ enabled })
+                        });
+                        await this.loadKeys();
+                    } catch (e) {
+                        console.error('Failed to toggle API key:', e);
+                    }
+                },
+                async deleteKey(id) {
+                    if (!confirm('Are you sure you want to delete this API key?')) return;
+                    try {
+                        await fetch(`/api/keys/${id}`, { method: 'DELETE' });
+                        await this.loadKeys();
+                        $store.global.showToast('API key deleted', 'success');
+                    } catch (e) {
+                        console.error('Failed to delete API key:', e);
+                    }
+                },
+                copyKey() {
+                    navigator.clipboard.writeText(this.generatedKey);
+                    $store.global.showToast('API key copied to clipboard', 'success');
+                },
+                formatDate(ts) {
+                    if (!ts) return 'Never';
+                    return new Date(ts).toLocaleDateString();
+                }
+            }" x-init="loadKeys()" class="space-y-6 max-w-3xl animate-fade-in pb-10">
+
+                <!-- Header with Generate Button -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-lg font-bold text-white">API Keys</h4>
+                        <p class="text-sm text-gray-500">Manage API keys for OpenAI-compatible access</p>
+                    </div>
+                    <div class="flex gap-2 items-center">
+                        <input type="text" x-model="newKeyName" placeholder="Key name (optional)"
+                            class="input input-sm input-bordered bg-space-800 border-space-border text-white w-48"
+                            @keydown.enter="generateKey()">
+                        <button @click="generateKey()"
+                            class="btn btn-sm bg-neon-purple hover:bg-purple-600 border-none text-white gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Generate Key
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Info Alert -->
+                <div class="alert bg-space-900/50 border-space-border text-sm shadow-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="text-gray-400">
+                        <p class="font-medium text-gray-300">OpenAI-Compatible API</p>
+                        <p class="text-xs mt-1">Use these keys with <code class="text-neon-cyan">POST /v1/chat/completions</code> endpoint. Compatible with OpenAI SDK, LangChain, Cursor, and more.</p>
+                    </div>
+                </div>
+
+                <!-- Keys List -->
+                <div class="view-card !p-0 overflow-hidden">
+                    <template x-if="loading">
+                        <div class="p-8 text-center text-gray-500">
+                            <span class="loading loading-spinner loading-md"></span>
+                        </div>
+                    </template>
+
+                    <template x-if="!loading && keys.length === 0">
+                        <div class="p-8 text-center">
+                            <div class="w-16 h-16 rounded-full bg-space-800 flex items-center justify-center mx-auto mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                            </div>
+                            <p class="text-gray-400 font-medium">No API Keys</p>
+                            <p class="text-gray-600 text-sm mt-1">Generate a key to enable API access</p>
+                        </div>
+                    </template>
+
+                    <template x-if="!loading && keys.length > 0">
+                        <table class="table w-full">
+                            <thead class="bg-space-900/50">
+                                <tr>
+                                    <th class="text-gray-500 font-medium text-xs uppercase">Name</th>
+                                    <th class="text-gray-500 font-medium text-xs uppercase">Key</th>
+                                    <th class="text-gray-500 font-medium text-xs uppercase">Created</th>
+                                    <th class="text-gray-500 font-medium text-xs uppercase">Last Used</th>
+                                    <th class="text-gray-500 font-medium text-xs uppercase">Requests</th>
+                                    <th class="text-gray-500 font-medium text-xs uppercase">Status</th>
+                                    <th class="text-gray-500 font-medium text-xs uppercase text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="key in keys" :key="key.id">
+                                    <tr class="hover:bg-white/5">
+                                        <td class="font-medium text-white" x-text="key.name"></td>
+                                        <td>
+                                            <code class="text-neon-cyan text-xs font-mono bg-space-800 px-2 py-1 rounded" x-text="key.keyMasked"></code>
+                                        </td>
+                                        <td class="text-gray-400 text-sm" x-text="formatDate(key.createdAt)"></td>
+                                        <td class="text-gray-400 text-sm" x-text="formatDate(key.lastUsed)"></td>
+                                        <td class="text-gray-400 text-sm font-mono" x-text="key.requestCount || 0"></td>
+                                        <td>
+                                            <span class="badge badge-sm"
+                                                :class="key.enabled ? 'badge-success' : 'badge-error'"
+                                                x-text="key.enabled ? 'Active' : 'Disabled'"></span>
+                                        </td>
+                                        <td class="text-right">
+                                            <div class="flex gap-2 justify-end">
+                                                <button @click="toggleKey(key.id, !key.enabled)"
+                                                    class="btn btn-xs btn-ghost"
+                                                    :class="key.enabled ? 'text-neon-yellow' : 'text-neon-green'">
+                                                    <span x-text="key.enabled ? 'Disable' : 'Enable'"></span>
+                                                </button>
+                                                <button @click="deleteKey(key.id)"
+                                                    class="btn btn-xs btn-ghost text-red-400 hover:text-red-300">
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                </div>
+
+                <!-- Usage Example -->
+                <div class="view-card border-space-border/50">
+                    <h5 class="text-sm font-bold text-white mb-3">Usage Example</h5>
+                    <pre class="bg-space-900 rounded-lg p-4 text-xs overflow-x-auto"><code class="text-gray-300">from openai import OpenAI
+
+client = OpenAI(
+    base_url="<span class="text-neon-cyan">http://localhost:8080/v1</span>",
+    api_key="<span class="text-neon-purple">your-api-key</span>"
+)
+
+response = client.chat.completions.create(
+    model="<span class="text-neon-green">gpt-4</span>",  # Maps to claude-opus-4-5-thinking
+    messages=[{"role": "user", "content": "Hello!"}]
+)</code></pre>
+                </div>
+
+                <!-- Generated Key Dialog -->
+                <div x-show="showDialog"
+                    class="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]"
+                    @click.self="showDialog = false" x-cloak>
+                    <div class="bg-space-900 border border-space-border rounded-lg p-6 max-w-lg w-full mx-4" @click.stop>
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-full bg-neon-green/20 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-neon-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-white">API Key Generated</h3>
+                                <p class="text-xs text-gray-500">Copy this key now - you won't see it again!</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-space-800 rounded-lg p-4 mb-4">
+                            <code class="text-neon-cyan text-sm font-mono break-all" x-text="generatedKey"></code>
+                        </div>
+
+                        <div class="flex justify-end gap-2">
+                            <button class="btn btn-sm btn-ghost text-gray-400" @click="showDialog = false">Close</button>
+                            <button class="btn btn-sm bg-neon-purple hover:bg-purple-600 border-none text-white gap-2" @click="copyKey()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Copy Key
                             </button>
                         </div>
                     </div>

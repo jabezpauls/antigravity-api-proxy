@@ -16,7 +16,7 @@ import path from 'path';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import express from 'express';
-import { getPublicConfig, saveConfig, config } from '../config.js';
+import { getPublicConfig, saveConfig, config, createApiKey, listApiKeys, updateApiKey, deleteApiKey } from '../config.js';
 import { DEFAULT_PORT, ACCOUNT_CONFIG_PATH } from '../constants.js';
 import { readClaudeConfig, updateClaudeConfig, replaceClaudeConfig, getClaudeConfigPath, readPresets, savePreset, deletePreset } from '../utils/claude-config.js';
 import { logger } from '../utils/logger.js';
@@ -403,6 +403,119 @@ export function mountWebUI(app, dirname, accountManager) {
                 }
             });
         } catch (error) {
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    // ==========================================
+    // API Key Management
+    // ==========================================
+
+    /**
+     * GET /api/keys - List all API keys (masked)
+     */
+    app.get('/api/keys', (req, res) => {
+        try {
+            const keys = listApiKeys();
+            res.json({
+                status: 'ok',
+                keys: keys,
+                legacyKeyConfigured: !!config.apiKey
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error listing API keys:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * POST /api/keys - Generate a new API key
+     */
+    app.post('/api/keys', (req, res) => {
+        try {
+            const { name } = req.body;
+            const keyEntry = createApiKey(name || 'Unnamed Key');
+
+            logger.info(`[WebUI] Created new API key: ${keyEntry.name}`);
+
+            // Return full key only on creation (user must copy it immediately)
+            res.json({
+                status: 'ok',
+                key: {
+                    id: keyEntry.id,
+                    key: keyEntry.key, // Full key visible only on creation
+                    name: keyEntry.name,
+                    enabled: keyEntry.enabled,
+                    createdAt: keyEntry.createdAt
+                },
+                message: 'API key created. Copy it now - you won\'t be able to see it again!'
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error creating API key:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * PATCH /api/keys/:id - Update API key (name, enabled)
+     */
+    app.patch('/api/keys/:id', (req, res) => {
+        try {
+            const { id } = req.params;
+            const { name, enabled } = req.body;
+
+            const updates = {};
+            if (name !== undefined) updates.name = name;
+            if (enabled !== undefined) updates.enabled = enabled;
+
+            if (Object.keys(updates).length === 0) {
+                return res.status(400).json({
+                    status: 'error',
+                    error: 'No valid updates provided (name or enabled)'
+                });
+            }
+
+            const success = updateApiKey(id, updates);
+            if (!success) {
+                return res.status(404).json({
+                    status: 'error',
+                    error: 'API key not found'
+                });
+            }
+
+            logger.info(`[WebUI] Updated API key ${id}`);
+            res.json({
+                status: 'ok',
+                message: 'API key updated'
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error updating API key:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * DELETE /api/keys/:id - Delete an API key
+     */
+    app.delete('/api/keys/:id', (req, res) => {
+        try {
+            const { id } = req.params;
+
+            const success = deleteApiKey(id);
+            if (!success) {
+                return res.status(404).json({
+                    status: 'error',
+                    error: 'API key not found'
+                });
+            }
+
+            logger.info(`[WebUI] Deleted API key ${id}`);
+            res.json({
+                status: 'ok',
+                message: 'API key deleted'
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error deleting API key:', error);
             res.status(500).json({ status: 'error', error: error.message });
         }
     });

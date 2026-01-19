@@ -9,8 +9,15 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { sendMessage, sendMessageStream, listModels, getModelQuotas, getSubscriptionTier } from './cloudcode/index.js';
+import {
+    convertOpenAIToAnthropic,
+    convertAnthropicToOpenAI,
+    createOpenAIStreamAdapter,
+    getOpenAIModels,
+    mapModel
+} from './format/openai/index.js';
 import { mountWebUI } from './webui/index.js';
-import { config } from './config.js';
+import { config, validateApiKey, recordApiKeyUsage, isApiKeyRequired } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,8 +88,8 @@ app.use(express.json({ limit: REQUEST_BODY_LIMIT }));
 
 // API Key authentication middleware for /v1/* endpoints
 app.use('/v1', (req, res, next) => {
-    // Skip validation if apiKey is not configured
-    if (!config.apiKey) {
+    // Skip validation if no API keys are configured
+    if (!isApiKeyRequired()) {
         return next();
     }
 
@@ -96,7 +103,10 @@ app.use('/v1', (req, res, next) => {
         providedKey = xApiKey;
     }
 
-    if (!providedKey || providedKey !== config.apiKey) {
+    // Validate against both legacy single key and multi-key array
+    const { valid, keyEntry } = validateApiKey(providedKey);
+
+    if (!valid) {
         logger.warn(`[API] Unauthorized request from ${req.ip}, invalid API key`);
         return res.status(401).json({
             type: 'error',
@@ -105,6 +115,12 @@ app.use('/v1', (req, res, next) => {
                 message: 'Invalid or missing API key'
             }
         });
+    }
+
+    // Record usage for multi-key (async, non-blocking)
+    if (keyEntry) {
+        req.apiKeyId = keyEntry.id;
+        recordApiKeyUsage(keyEntry.id);
     }
 
     next();
@@ -836,6 +852,122 @@ app.post('/v1/messages', async (req, res) => {
                 }
             });
         }
+    }
+});
+
+/**
+ * OpenAI-compatible Chat Completions API
+ * POST /v1/chat/completions
+ *
+ * Provides compatibility with OpenAI SDK and tools like LangChain, Cursor, etc.
+ */
+app.post('/v1/chat/completions', async (req, res) => {
+    try {
+        await ensureInitialized();
+
+        const { model, messages, stream } = req.body;
+        const requestModel = model || 'gpt-4';
+
+        // Map OpenAI model name to internal model
+        const internalModel = mapModel(requestModel);
+
+        logger.info(`[OpenAI API] Request for model: ${requestModel} → ${internalModel}, stream: ${!!stream}`);
+
+        // Convert OpenAI request to Anthropic format
+        const anthropicRequest = convertOpenAIToAnthropic(req.body);
+
+        // Optimistic Retry: If ALL accounts are rate-limited, reset them
+        if (accountManager.isAllRateLimited(internalModel)) {
+            logger.warn(`[OpenAI API] All accounts rate-limited for ${internalModel}. Resetting state for optimistic retry.`);
+            accountManager.resetAllRateLimits();
+        }
+
+        if (stream) {
+            // Handle streaming response (OpenAI SSE format)
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('X-Accel-Buffering', 'no');
+            res.flushHeaders();
+
+            try {
+                const adapter = createOpenAIStreamAdapter(requestModel);
+
+                // Stream Anthropic events and convert to OpenAI format
+                for await (const event of sendMessageStream(anthropicRequest, accountManager, FALLBACK_ENABLED)) {
+                    const openaiLine = adapter.transform(event);
+                    if (openaiLine) {
+                        res.write(openaiLine);
+                        if (res.flush) res.flush();
+                    }
+                }
+                res.end();
+
+            } catch (streamError) {
+                logger.error('[OpenAI API] Stream error:', streamError);
+                const { errorMessage } = parseError(streamError);
+                res.write(`data: ${JSON.stringify({
+                    error: { message: errorMessage, type: 'server_error', code: null }
+                })}\n\n`);
+                res.end();
+            }
+
+        } else {
+            // Handle non-streaming response
+            const anthropicResponse = await sendMessage(anthropicRequest, accountManager, FALLBACK_ENABLED);
+
+            // Convert Anthropic response to OpenAI format
+            const openaiResponse = convertAnthropicToOpenAI(anthropicResponse, requestModel);
+            res.json(openaiResponse);
+        }
+
+    } catch (error) {
+        logger.error('[OpenAI API] Error:', error);
+
+        const { statusCode, errorMessage } = parseError(error);
+
+        // Check if headers have already been sent (for streaming that failed mid-way)
+        if (res.headersSent) {
+            res.write(`data: ${JSON.stringify({
+                error: { message: errorMessage, type: 'server_error', code: null }
+            })}\n\n`);
+            res.end();
+        } else {
+            res.status(statusCode).json({
+                error: {
+                    message: errorMessage,
+                    type: 'server_error',
+                    param: null,
+                    code: null
+                }
+            });
+        }
+    }
+});
+
+/**
+ * OpenAI-compatible Models List
+ * GET /v1/models (with OpenAI format option)
+ *
+ * Returns models in OpenAI format when Accept header includes 'openai'
+ * or when ?format=openai query param is set
+ */
+app.get('/v1/models/openai', async (req, res) => {
+    try {
+        const models = getOpenAIModels();
+        res.json({
+            object: 'list',
+            data: models
+        });
+    } catch (error) {
+        logger.error('[OpenAI API] Error listing models:', error);
+        res.status(500).json({
+            error: {
+                message: error.message,
+                type: 'server_error',
+                code: null
+            }
+        });
     }
 });
 
