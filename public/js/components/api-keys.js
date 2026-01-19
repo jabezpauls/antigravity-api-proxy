@@ -21,7 +21,16 @@ window.Components.apiKeys = () => ({
     generatedKey: null,
     showCreateDialog: false,
     showEditDialog: false,
-    editingKey: null,
+    editingKey: {
+        id: null,
+        name: '',
+        allowed_models_arr: [],
+        rate_limit_rpm: '',
+        rate_limit_rph: '',
+        ip_whitelist_str: '',
+        expires_at_str: '',
+        notes: ''
+    },
     searchQuery: '',
     showModelDropdown: false,
     showEditModelDropdown: false,
@@ -212,11 +221,20 @@ window.Components.apiKeys = () => ({
 
     closeEditDialog() {
         this.showEditDialog = false;
-        this.editingKey = null;
+        this.editingKey = {
+            id: null,
+            name: '',
+            allowed_models_arr: [],
+            rate_limit_rpm: '',
+            rate_limit_rph: '',
+            ip_whitelist_str: '',
+            expires_at_str: '',
+            notes: ''
+        };
     },
 
     async saveKey() {
-        if (!this.editingKey) return;
+        if (!this.editingKey.id) return;
 
         try {
             const body = {

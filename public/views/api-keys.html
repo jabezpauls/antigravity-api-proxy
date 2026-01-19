@@ -246,7 +246,7 @@
 
     <!-- Edit Dialog -->
     <dialog :open="showEditDialog" class="modal modal-open" x-show="showEditDialog" x-cloak>
-        <div class="modal-box bg-space-800 max-w-lg" x-show="editingKey">
+        <div class="modal-box bg-space-800 max-w-lg" x-show="editingKey.id">
             <form @submit.prevent="saveKey()">
                 <h3 class="font-bold text-lg text-white mb-4">Edit API Key</h3>
 
