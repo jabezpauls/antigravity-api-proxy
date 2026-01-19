@@ -182,6 +182,16 @@
                         </svg>
                         <span x-text="$store.global.t('accounts')">Accounts</span>
                     </button>
+                    <button
+                        class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5"
+                        :class="{'active': $store.global.activeTab === 'api-keys'}"
+                        @click="$store.global.activeTab = 'api-keys'">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                        <span>API Keys</span>
+                    </button>
                 </nav>
 
                 <div class="px-4 mt-8 mb-2 text-xs font-bold text-gray-600 uppercase tracking-widest"
@@ -195,6 +205,15 @@
                                 d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                         <span x-text="$store.global.t('logs')">Logs</span>
+                    </button>
+                    <button
+                        class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5"
+                        :class="{'active': $store.global.activeTab === 'request-logs'}" @click="$store.global.activeTab = 'request-logs'">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Request Logs</span>
                     </button>
                     <button
                         class="nav-item flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5"
@@ -241,6 +260,16 @@
 
             <!-- Accounts -->
             <div x-show="$store.global.activeTab === 'accounts'" x-load-view="'accounts'"
+                x-transition:enter="fade-enter-active" x-transition:enter-start="fade-enter-from"
+                class="w-full"></div>
+
+            <!-- API Keys -->
+            <div x-show="$store.global.activeTab === 'api-keys'" x-load-view="'api-keys'"
+                x-transition:enter="fade-enter-active" x-transition:enter-start="fade-enter-from"
+                class="w-full"></div>
+
+            <!-- Request Logs -->
+            <div x-show="$store.global.activeTab === 'request-logs'" x-load-view="'request-logs'"
                 x-transition:enter="fade-enter-active" x-transition:enter-start="fade-enter-from"
                 class="w-full"></div>
 
@@ -374,6 +403,8 @@
     <script src="js/components/claude-config.js"></script>
     <script src="js/components/logs-viewer.js"></script>
     <script src="js/components/server-config.js"></script>
+    <script src="js/components/api-keys.js"></script>
+    <script src="js/components/request-logs.js"></script>
     <!-- 4. App (registers Alpine components from window.Components) -->
     <script src="app.js"></script>
 </body>

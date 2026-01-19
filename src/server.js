@@ -17,17 +17,27 @@ import {
     mapModel
 } from './format/openai/index.js';
 import { mountWebUI } from './webui/index.js';
-import { config, validateApiKey, recordApiKeyUsage, isApiKeyRequired } from './config.js';
+import { config } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { forceRefresh } from './auth/token-extractor.js';
 import { REQUEST_BODY_LIMIT } from './constants.js';
 import { AccountManager } from './account-manager/index.js';
-import { clearThinkingSignatureCache } from './format/signature-cache.js';
 import { formatDuration } from './utils/helpers.js';
 import { logger } from './utils/logger.js';
-import usageStats from './modules/usage-stats.js';
+
+// Database and API key management
+import { initDatabase } from './database/index.js';
+import {
+    validateApiKey,
+    extractApiKey,
+    recordRequest,
+    recordApiKeyUsage,
+    hasApiKeys
+} from './api-keys/index.js';
+import { createRequestLog } from './database/models/request-logs.js';
+import { pruneOldLogs } from './database/migrations.js';
 
 // Parse fallback flag directly from command line args to avoid circular dependency
 const args = process.argv.slice(2);
@@ -47,6 +57,24 @@ const app = express();
 
 // Disable x-powered-by header for security
 app.disable('x-powered-by');
+
+// Initialize database
+let db = null;
+try {
+    db = initDatabase();
+    logger.info('[Server] Database initialized');
+
+    // Schedule log pruning (runs daily)
+    setInterval(() => {
+        try {
+            pruneOldLogs(db, 30);
+        } catch (e) {
+            logger.error('[Server] Log pruning error:', e);
+        }
+    }, 24 * 60 * 60 * 1000);
+} catch (dbError) {
+    logger.error('[Server] Database initialization failed:', dbError);
+}
 
 // Initialize account manager (will be fully initialized on first request or startup)
 export const accountManager = new AccountManager();
@@ -88,46 +116,49 @@ app.use(express.json({ limit: REQUEST_BODY_LIMIT }));
 
 // API Key authentication middleware for /v1/* endpoints
 app.use('/v1', (req, res, next) => {
-    // Skip validation if no API keys are configured
-    if (!isApiKeyRequired()) {
+    // Skip validation if no API keys are configured in database
+    if (!hasApiKeys()) {
         return next();
     }
 
-    const authHeader = req.headers['authorization'];
-    const xApiKey = req.headers['x-api-key'];
+    // Extract API key from headers
+    const providedKey = extractApiKey(req.headers);
 
-    let providedKey = '';
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        providedKey = authHeader.substring(7);
-    } else if (xApiKey) {
-        providedKey = xApiKey;
-    }
+    // Get client IP and model from request
+    const clientIp = req.ip || req.connection.remoteAddress;
+    const model = req.body?.model;
 
-    // Validate against both legacy single key and multi-key array
-    const { valid, keyEntry } = validateApiKey(providedKey);
+    // Validate key with all restrictions (model, IP, rate limit, expiration)
+    const result = validateApiKey(providedKey, { model, ip: clientIp });
 
-    if (!valid) {
-        logger.warn(`[API] Unauthorized request from ${req.ip}, invalid API key`);
-        return res.status(401).json({
+    if (!result.valid) {
+        logger.warn(`[API] Unauthorized request from ${clientIp}: ${result.error}`);
+
+        const response = {
             type: 'error',
             error: {
-                type: 'authentication_error',
-                message: 'Invalid or missing API key'
+                type: result.status === 429 ? 'rate_limit_error' : 'authentication_error',
+                message: result.error
             }
-        });
+        };
+
+        // Add Retry-After header for rate limits
+        if (result.retryAfter) {
+            res.setHeader('Retry-After', result.retryAfter);
+        }
+
+        return res.status(result.status || 401).json(response);
     }
 
-    // Record usage for multi-key (async, non-blocking)
-    if (keyEntry) {
-        req.apiKeyId = keyEntry.id;
-        recordApiKeyUsage(keyEntry.id);
-    }
+    // Store key info for request logging
+    req.apiKeyId = result.key.id;
+    req.apiKeyEntry = result.key;
+
+    // Record rate limit usage
+    recordRequest(result.key.id);
 
     next();
 });
-
-// Setup usage statistics middleware
-usageStats.setupMiddleware(app);
 
 /**
  * Silent handler for Claude Code CLI root POST requests
@@ -232,15 +263,6 @@ app.post('/', (req, res) => {
     res.status(200).json({ status: 'ok' });
 });
 
-/**
- * Test endpoint - Clear thinking signature cache
- * Used for testing cold cache scenarios in cross-model tests
- */
-app.post('/test/clear-signature-cache', (req, res) => {
-    clearThinkingSignatureCache();
-    logger.debug('[Test] Cleared thinking signature cache');
-    res.json({ success: true, message: 'Thinking signature cache cleared' });
-});
 
 /**
  * Health check endpoint - Detailed status
@@ -610,9 +632,9 @@ app.get('/account-limits', async (req, res) => {
             })
         };
 
-        // Optionally include usage history (for dashboard performance optimization)
+        // Usage history is now tracked per API key in request_logs table
         if (includeHistory) {
-            responseData.history = usageStats.getHistory();
+            responseData.history = {}; // Deprecated - use /api/logs/requests instead
         }
 
         res.json(responseData);
@@ -703,6 +725,11 @@ app.post('/v1/messages/count_tokens', (req, res) => {
  * POST /v1/messages
  */
 app.post('/v1/messages', async (req, res) => {
+    const startTime = Date.now();
+    const apiKeyId = req.apiKeyId || null;
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || null;
+
     try {
         // Ensure account manager is initialized
         await ensureInitialized();
@@ -813,6 +840,29 @@ app.post('/v1/messages', async (req, res) => {
             // Handle non-streaming response
             const response = await sendMessage(request, accountManager, FALLBACK_ENABLED);
             res.json(response);
+
+            // Log request to database (async, don't await)
+            if (apiKeyId) {
+                const durationMs = Date.now() - startTime;
+                createRequestLog({
+                    api_key_id: apiKeyId,
+                    timestamp: startTime,
+                    model: model || requestedModel,
+                    actual_model: response.model || modelId,
+                    account_email: null, // Could be extracted from response if available
+                    request_messages: messages,
+                    request_system: system || null,
+                    response_content: response.content || null,
+                    input_tokens: response.usage?.input_tokens || null,
+                    output_tokens: response.usage?.output_tokens || null,
+                    duration_ms: durationMs,
+                    status: 'success',
+                    error_message: null,
+                    http_status: 200,
+                    client_ip: clientIp,
+                    user_agent: userAgent
+                });
+            }
         }
 
     } catch (error) {
@@ -850,6 +900,30 @@ app.post('/v1/messages', async (req, res) => {
                     type: errorType,
                     message: errorMessage
                 }
+            });
+        }
+
+        // Log error to database (async, don't await)
+        if (apiKeyId) {
+            const durationMs = Date.now() - startTime;
+            const { model, messages, system } = req.body || {};
+            createRequestLog({
+                api_key_id: apiKeyId,
+                timestamp: startTime,
+                model: model || 'unknown',
+                actual_model: null,
+                account_email: null,
+                request_messages: messages || [],
+                request_system: system || null,
+                response_content: null,
+                input_tokens: null,
+                output_tokens: null,
+                duration_ms: durationMs,
+                status: statusCode === 429 ? 'rate_limited' : 'error',
+                error_message: errorMessage,
+                http_status: statusCode,
+                client_ip: clientIp,
+                user_agent: userAgent
             });
         }
     }
@@ -974,8 +1048,6 @@ app.get('/v1/models/openai', async (req, res) => {
 /**
  * Catch-all for unsupported endpoints
  */
-usageStats.setupRoutes(app);
-
 app.use('*', (req, res) => {
     // Log 404s (use originalUrl since wildcard strips req.path)
     if (logger.isDebugEnabled) {

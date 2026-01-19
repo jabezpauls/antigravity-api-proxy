@@ -77,6 +77,18 @@ src/
 ├── errors.js                   # Custom error classes
 ├── fallback-config.js          # Model fallback mappings and helpers
 │
+├── database/                   # SQLite database
+│   ├── index.js                # Connection and initialization
+│   ├── migrations.js           # Schema migrations
+│   └── models/                 # Data access layer
+│       ├── api-keys.js         # API key CRUD operations
+│       └── request-logs.js     # Request log CRUD operations
+│
+├── api-keys/                   # API Key Management
+│   ├── index.js                # Public exports
+│   ├── validator.js            # Key validation, model patterns, IP matching
+│   └── rate-limiter.js         # Sliding window rate limiter
+│
 ├── cloudcode/                  # Cloud Code API client
 │   ├── index.js                # Public API exports
 │   ├── session-manager.js      # Session ID derivation for caching
@@ -96,13 +108,7 @@ src/
 │   └── strategies/             # Account selection strategies
 │       ├── index.js            # Strategy factory (createStrategy)
 │       ├── base-strategy.js    # Abstract base class
-│       ├── sticky-strategy.js  # Cache-optimized sticky selection
-│       ├── round-robin-strategy.js  # Load-balanced rotation
-│       ├── hybrid-strategy.js  # Smart multi-signal distribution
-│       └── trackers/           # State trackers for hybrid strategy
-│           ├── index.js        # Re-exports trackers
-│           ├── health-tracker.js    # Account health scores
-│           └── token-bucket-tracker.js  # Client-side rate limiting
+│       └── round-robin-strategy.js  # Load-balanced rotation
 │
 ├── auth/                       # Authentication
 │   ├── oauth.js                # Google OAuth with PKCE
@@ -155,13 +161,15 @@ public/
 │   │   ├── logs-viewer.js      # Live log streaming
 │   │   ├── claude-config.js    # CLI settings editor
 │   │   ├── server-config.js    # Server settings UI
+│   │   ├── api-keys.js         # API key management
+│   │   ├── request-logs.js     # Request logs viewer
 │   │   └── dashboard/          # Dashboard sub-modules
 │   │       ├── stats.js        # Account statistics calculation
 │   │       ├── charts.js       # Chart.js visualizations
 │   │       └── filters.js      # Chart filter state management
 │   └── utils/                  # Frontend utilities
 │       ├── error-handler.js    # Centralized error handling with ErrorHandler.withLoading
-│       ├── account-actions.js  # Account operations service layer (NEW)
+│       ├── account-actions.js  # Account operations service layer
 │       ├── validators.js       # Input validation
 │       └── model-config.js     # Model configuration helpers
 └── views/                      # HTML partials (loaded dynamically)
@@ -169,7 +177,9 @@ public/
     ├── accounts.html
     ├── models.html
     ├── settings.html
-    └── logs.html
+    ├── logs.html
+    ├── api-keys.html           # API key management view
+    └── request-logs.html       # Request logs view
 ```
 
 **Key Modules:**
@@ -348,11 +358,20 @@ Each account object in `accounts.json` contains:
 - `/api/logs/stream` - SSE endpoint for real-time logs
 - `/api/stats/history` - Retrieve 30-day request history (sorted chronologically)
 - `/api/auth/url` - Generate Google OAuth URL
-- `/api/keys` - API key management (list, create, update, delete)
+- `/api/keys` - API key management
   - `GET /api/keys` - List all keys (masked for display)
-  - `POST /api/keys` - Generate new key (returns full key once)
-  - `PATCH /api/keys/:id` - Update key (name, enabled)
+  - `POST /api/keys` - Create key with restrictions (allowed_models, rate_limit_rpm/rph, ip_whitelist, expires_at)
+  - `GET /api/keys/:id` - Get specific key details
+  - `PATCH /api/keys/:id` - Update key settings
   - `DELETE /api/keys/:id` - Delete key
+  - `POST /api/keys/:id/regenerate` - Regenerate key with same settings
+- `/api/logs/requests` - Request logging per API key
+  - `GET /api/logs/requests` - List logs (paginated, filterable by api_key_id, model, status, date range)
+  - `GET /api/logs/requests/:id` - Get full log with request/response content
+  - `DELETE /api/logs/requests/:id` - Delete specific log
+  - `POST /api/logs/requests/clear` - Clear logs by criteria
+  - `GET /api/logs/requests/export` - Export logs as CSV/JSON
+  - `GET /api/logs/requests/stats` - Get request statistics
 - `/account-limits` - Fetch account quotas and subscription data
   - Returns: `{ accounts: [{ email, subscription: { tier, projectId }, limits: {...} }], models: [...] }`
   - Query params: `?format=table` (ASCII table) or `?includeHistory=true` (adds usage stats)

@@ -16,12 +16,32 @@ import path from 'path';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import express from 'express';
-import { getPublicConfig, saveConfig, config, createApiKey, listApiKeys, updateApiKey, deleteApiKey } from '../config.js';
+import { getPublicConfig, saveConfig, config } from '../config.js';
 import { DEFAULT_PORT, ACCOUNT_CONFIG_PATH } from '../constants.js';
-import { readClaudeConfig, updateClaudeConfig, replaceClaudeConfig, getClaudeConfigPath, readPresets, savePreset, deletePreset } from '../utils/claude-config.js';
 import { logger } from '../utils/logger.js';
 import { getAuthorizationUrl, completeOAuthFlow, startCallbackServer } from '../auth/oauth.js';
 import { loadAccounts, saveAccounts } from '../account-manager/storage.js';
+
+// API Keys (database-backed)
+import {
+    createApiKey,
+    listApiKeys,
+    getApiKeyById,
+    updateApiKey,
+    deleteApiKey,
+    regenerateApiKey,
+    getRateLimitStatus
+} from '../api-keys/index.js';
+
+// Request Logs
+import {
+    getRequestLogs,
+    getRequestLogById,
+    deleteRequestLog,
+    clearRequestLogs,
+    getRequestStats,
+    exportRequestLogs
+} from '../database/models/request-logs.js';
 
 // Get package version
 const __filename = fileURLToPath(import.meta.url);
@@ -408,7 +428,7 @@ export function mountWebUI(app, dirname, accountManager) {
     });
 
     // ==========================================
-    // API Key Management
+    // API Key Management (Advanced - Database-backed)
     // ==========================================
 
     /**
@@ -419,8 +439,7 @@ export function mountWebUI(app, dirname, accountManager) {
             const keys = listApiKeys();
             res.json({
                 status: 'ok',
-                keys: keys,
-                legacyKeyConfigured: !!config.apiKey
+                keys: keys
             });
         } catch (error) {
             logger.error('[WebUI] Error listing API keys:', error);
@@ -429,25 +448,64 @@ export function mountWebUI(app, dirname, accountManager) {
     });
 
     /**
-     * POST /api/keys - Generate a new API key
+     * GET /api/keys/:id - Get API key details
+     */
+    app.get('/api/keys/:id', (req, res) => {
+        try {
+            const { id } = req.params;
+            const key = getApiKeyById(id);
+
+            if (!key) {
+                return res.status(404).json({
+                    status: 'error',
+                    error: 'API key not found'
+                });
+            }
+
+            // Add rate limit status
+            const rateLimitStatus = getRateLimitStatus(key);
+
+            res.json({
+                status: 'ok',
+                key: { ...key, rateLimitStatus }
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error getting API key:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * POST /api/keys - Create a new API key with restrictions
      */
     app.post('/api/keys', (req, res) => {
         try {
-            const { name } = req.body;
-            const keyEntry = createApiKey(name || 'Unnamed Key');
+            const {
+                name,
+                allowed_models,
+                rate_limit_rpm,
+                rate_limit_rph,
+                ip_whitelist,
+                expires_at,
+                notes
+            } = req.body;
+
+            const keyEntry = createApiKey({
+                name: name || 'Unnamed Key',
+                allowed_models,
+                rate_limit_rpm,
+                rate_limit_rph,
+                ip_whitelist,
+                expires_at,
+                notes
+            });
 
             logger.info(`[WebUI] Created new API key: ${keyEntry.name}`);
 
-            // Return full key only on creation (user must copy it immediately)
+            // Return full key only on creation
             res.json({
                 status: 'ok',
-                key: {
-                    id: keyEntry.id,
-                    key: keyEntry.key, // Full key visible only on creation
-                    name: keyEntry.name,
-                    enabled: keyEntry.enabled,
-                    createdAt: keyEntry.createdAt
-                },
+                key: keyEntry, // Includes full key - shown only once!
                 message: 'API key created. Copy it now - you won\'t be able to see it again!'
             });
         } catch (error) {
@@ -457,21 +515,36 @@ export function mountWebUI(app, dirname, accountManager) {
     });
 
     /**
-     * PATCH /api/keys/:id - Update API key (name, enabled)
+     * PATCH /api/keys/:id - Update API key settings
      */
     app.patch('/api/keys/:id', (req, res) => {
         try {
             const { id } = req.params;
-            const { name, enabled } = req.body;
+            const {
+                name,
+                allowed_models,
+                rate_limit_rpm,
+                rate_limit_rph,
+                ip_whitelist,
+                expires_at,
+                enabled,
+                notes
+            } = req.body;
 
             const updates = {};
             if (name !== undefined) updates.name = name;
+            if (allowed_models !== undefined) updates.allowed_models = allowed_models;
+            if (rate_limit_rpm !== undefined) updates.rate_limit_rpm = rate_limit_rpm;
+            if (rate_limit_rph !== undefined) updates.rate_limit_rph = rate_limit_rph;
+            if (ip_whitelist !== undefined) updates.ip_whitelist = ip_whitelist;
+            if (expires_at !== undefined) updates.expires_at = expires_at;
             if (enabled !== undefined) updates.enabled = enabled;
+            if (notes !== undefined) updates.notes = notes;
 
             if (Object.keys(updates).length === 0) {
                 return res.status(400).json({
                     status: 'error',
-                    error: 'No valid updates provided (name or enabled)'
+                    error: 'No valid updates provided'
                 });
             }
 
@@ -486,7 +559,8 @@ export function mountWebUI(app, dirname, accountManager) {
             logger.info(`[WebUI] Updated API key ${id}`);
             res.json({
                 status: 'ok',
-                message: 'API key updated'
+                message: 'API key updated',
+                key: getApiKeyById(id)
             });
         } catch (error) {
             logger.error('[WebUI] Error updating API key:', error);
@@ -520,145 +594,210 @@ export function mountWebUI(app, dirname, accountManager) {
         }
     });
 
-    // ==========================================
-    // Claude CLI Configuration API
-    // ==========================================
-
     /**
-     * GET /api/claude/config - Get Claude CLI configuration
+     * POST /api/keys/:id/regenerate - Regenerate an API key (new key, same settings)
      */
-    app.get('/api/claude/config', async (req, res) => {
+    app.post('/api/keys/:id/regenerate', (req, res) => {
         try {
-            const claudeConfig = await readClaudeConfig();
+            const { id } = req.params;
+
+            const newKey = regenerateApiKey(id);
+            if (!newKey) {
+                return res.status(404).json({
+                    status: 'error',
+                    error: 'API key not found'
+                });
+            }
+
+            logger.info(`[WebUI] Regenerated API key ${id}`);
             res.json({
                 status: 'ok',
-                config: claudeConfig,
-                path: getClaudeConfigPath()
+                key: newKey, // Includes new full key - shown only once!
+                message: 'API key regenerated. Copy the new key now!'
             });
         } catch (error) {
+            logger.error('[WebUI] Error regenerating API key:', error);
             res.status(500).json({ status: 'error', error: error.message });
         }
     });
 
-    /**
-     * POST /api/claude/config - Update Claude CLI configuration
-     */
-    app.post('/api/claude/config', async (req, res) => {
-        try {
-            const updates = req.body;
-            if (!updates || typeof updates !== 'object') {
-                return res.status(400).json({ status: 'error', error: 'Invalid config updates' });
-            }
+    // ==========================================
+    // Request Logs API
+    // ==========================================
 
-            const newConfig = await updateClaudeConfig(updates);
-            res.json({
-                status: 'ok',
-                config: newConfig,
-                message: 'Claude configuration updated'
+    /**
+     * GET /api/logs/requests - List request logs with filtering and pagination
+     */
+    app.get('/api/logs/requests', (req, res) => {
+        try {
+            const {
+                api_key_id,
+                model,
+                status,
+                from,
+                to,
+                search,
+                page = 1,
+                limit = 50
+            } = req.query;
+
+            const result = getRequestLogs({
+                api_key_id,
+                model,
+                status,
+                from: from ? parseInt(from) : undefined,
+                to: to ? parseInt(to) : undefined,
+                search,
+                page: parseInt(page),
+                limit: Math.min(parseInt(limit), 100) // Cap at 100
             });
-        } catch (error) {
-            res.status(500).json({ status: 'error', error: error.message });
-        }
-    });
-
-    /**
-     * POST /api/claude/config/restore - Restore Claude CLI to default (remove proxy settings)
-     */
-    app.post('/api/claude/config/restore', async (req, res) => {
-        try {
-            const claudeConfig = await readClaudeConfig();
-
-            // Proxy-related environment variables to remove when restoring defaults
-            const PROXY_ENV_VARS = [
-                'ANTHROPIC_BASE_URL',
-                'ANTHROPIC_AUTH_TOKEN',
-                'ANTHROPIC_MODEL',
-                'CLAUDE_CODE_SUBAGENT_MODEL',
-                'ANTHROPIC_DEFAULT_OPUS_MODEL',
-                'ANTHROPIC_DEFAULT_SONNET_MODEL',
-                'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-                'ENABLE_EXPERIMENTAL_MCP_CLI'
-            ];
-
-            // Remove proxy-related environment variables to restore defaults
-            if (claudeConfig.env) {
-                for (const key of PROXY_ENV_VARS) {
-                    delete claudeConfig.env[key];
-                }
-                // Remove env entirely if empty to truly restore defaults
-                if (Object.keys(claudeConfig.env).length === 0) {
-                    delete claudeConfig.env;
-                }
-            }
-
-            // Use replaceClaudeConfig to completely overwrite the config (not merge)
-            const newConfig = await replaceClaudeConfig(claudeConfig);
-
-            logger.info(`[WebUI] Restored Claude CLI config to defaults at ${getClaudeConfigPath()}`);
 
             res.json({
                 status: 'ok',
-                config: newConfig,
-                message: 'Claude CLI configuration restored to defaults'
+                ...result
             });
         } catch (error) {
-            logger.error('[WebUI] Error restoring Claude config:', error);
+            logger.error('[WebUI] Error listing request logs:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * GET /api/logs/requests/stats - Get request statistics
+     */
+    app.get('/api/logs/requests/stats', (req, res) => {
+        try {
+            const { api_key_id, from, to } = req.query;
+
+            const stats = getRequestStats({
+                api_key_id,
+                from: from ? parseInt(from) : undefined,
+                to: to ? parseInt(to) : undefined
+            });
+
+            res.json({
+                status: 'ok',
+                stats
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error getting request stats:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * GET /api/logs/requests/export - Export logs as CSV or JSON
+     */
+    app.get('/api/logs/requests/export', (req, res) => {
+        try {
+            const { api_key_id, model, status, from, to, search, format = 'csv' } = req.query;
+
+            const options = {
+                api_key_id,
+                model,
+                status,
+                from: from ? parseInt(from) : undefined,
+                to: to ? parseInt(to) : undefined,
+                search
+            };
+
+            if (format === 'csv') {
+                const csv = exportRequestLogs(options);
+                res.setHeader('Content-Type', 'text/csv');
+                res.setHeader('Content-Disposition', 'attachment; filename="request-logs.csv"');
+                res.send(csv);
+            } else {
+                // JSON format - return all logs without content
+                const result = getRequestLogs({ ...options, page: 1, limit: 10000 });
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Content-Disposition', 'attachment; filename="request-logs.json"');
+                res.json(result.logs);
+            }
+        } catch (error) {
+            logger.error('[WebUI] Error exporting request logs:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * GET /api/logs/requests/:id - Get full log details including content
+     */
+    app.get('/api/logs/requests/:id', (req, res) => {
+        try {
+            const { id } = req.params;
+            const log = getRequestLogById(id);
+
+            if (!log) {
+                return res.status(404).json({
+                    status: 'error',
+                    error: 'Request log not found'
+                });
+            }
+
+            res.json({
+                status: 'ok',
+                log
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error getting request log:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * DELETE /api/logs/requests/:id - Delete a specific log
+     */
+    app.delete('/api/logs/requests/:id', (req, res) => {
+        try {
+            const { id } = req.params;
+
+            const success = deleteRequestLog(id);
+            if (!success) {
+                return res.status(404).json({
+                    status: 'error',
+                    error: 'Request log not found'
+                });
+            }
+
+            logger.info(`[WebUI] Deleted request log ${id}`);
+            res.json({
+                status: 'ok',
+                message: 'Request log deleted'
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error deleting request log:', error);
+            res.status(500).json({ status: 'error', error: error.message });
+        }
+    });
+
+    /**
+     * POST /api/logs/requests/clear - Clear logs by date range
+     */
+    app.post('/api/logs/requests/clear', (req, res) => {
+        try {
+            const { from, to, api_key_id } = req.body;
+
+            const deleted = clearRequestLogs({
+                from,
+                to,
+                api_key_id
+            });
+
+            logger.info(`[WebUI] Cleared ${deleted} request logs`);
+            res.json({
+                status: 'ok',
+                deleted,
+                message: `Cleared ${deleted} request logs`
+            });
+        } catch (error) {
+            logger.error('[WebUI] Error clearing request logs:', error);
             res.status(500).json({ status: 'error', error: error.message });
         }
     });
 
     // ==========================================
-    // Claude CLI Presets API
+    // Model Configuration API
     // ==========================================
-
-    /**
-     * GET /api/claude/presets - Get all saved presets
-     */
-    app.get('/api/claude/presets', async (req, res) => {
-        try {
-            const presets = await readPresets();
-            res.json({ status: 'ok', presets });
-        } catch (error) {
-            res.status(500).json({ status: 'error', error: error.message });
-        }
-    });
-
-    /**
-     * POST /api/claude/presets - Save a new preset
-     */
-    app.post('/api/claude/presets', async (req, res) => {
-        try {
-            const { name, config: presetConfig } = req.body;
-            if (!name || typeof name !== 'string' || !name.trim()) {
-                return res.status(400).json({ status: 'error', error: 'Preset name is required' });
-            }
-            if (!presetConfig || typeof presetConfig !== 'object') {
-                return res.status(400).json({ status: 'error', error: 'Config object is required' });
-            }
-
-            const presets = await savePreset(name.trim(), presetConfig);
-            res.json({ status: 'ok', presets, message: `Preset "${name}" saved` });
-        } catch (error) {
-            res.status(500).json({ status: 'error', error: error.message });
-        }
-    });
-
-    /**
-     * DELETE /api/claude/presets/:name - Delete a preset
-     */
-    app.delete('/api/claude/presets/:name', async (req, res) => {
-        try {
-            const { name } = req.params;
-            if (!name) {
-                return res.status(400).json({ status: 'error', error: 'Preset name is required' });
-            }
-
-            const presets = await deletePreset(name);
-            res.json({ status: 'ok', presets, message: `Preset "${name}" deleted` });
-        } catch (error) {
-            res.status(500).json({ status: 'error', error: error.message });
-        }
-    });
 
     /**
      * POST /api/models/config - Update model configuration (hidden/pinned/alias)

@@ -1,0 +1,262 @@
+<div x-data="requestLogs" x-init="init()" class="view-container">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Request Logs</h1>
+            <p class="text-gray-400 text-sm mt-1">View and filter API request history</p>
+        </div>
+        <div class="flex gap-2">
+            <div class="dropdown dropdown-end">
+                <button tabindex="0" class="btn btn-ghost btn-sm gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export
+                </button>
+                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-space-800 rounded-box w-32">
+                    <li><a @click="exportLogs('csv')">CSV</a></li>
+                    <li><a @click="exportLogs('json')">JSON</a></li>
+                </ul>
+            </div>
+            <button @click="clearLogs()" class="btn btn-ghost btn-sm text-red-400 gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-space-800 rounded-lg p-4 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="form-control">
+                <label class="label py-1"><span class="label-text text-xs">API Key</span></label>
+                <select x-model="filters.api_key_id" class="select select-bordered select-sm bg-space-900">
+                    <option value="">All Keys</option>
+                    <template x-for="key in apiKeys" :key="key.id">
+                        <option :value="key.id" x-text="key.name"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label py-1"><span class="label-text text-xs">Model</span></label>
+                <select x-model="filters.model" class="select select-bordered select-sm bg-space-900">
+                    <option value="">All Models</option>
+                    <template x-for="model in models" :key="model">
+                        <option :value="model" x-text="model"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label py-1"><span class="label-text text-xs">Status</span></label>
+                <select x-model="filters.status" class="select select-bordered select-sm bg-space-900">
+                    <option value="">All</option>
+                    <option value="success">Success</option>
+                    <option value="error">Error</option>
+                    <option value="rate_limited">Rate Limited</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label py-1"><span class="label-text text-xs">From</span></label>
+                <input type="datetime-local" x-model="filters.from" class="input input-bordered input-sm bg-space-900" />
+            </div>
+            <div class="form-control">
+                <label class="label py-1"><span class="label-text text-xs">To</span></label>
+                <input type="datetime-local" x-model="filters.to" class="input input-bordered input-sm bg-space-900" />
+            </div>
+            <div class="form-control">
+                <label class="label py-1"><span class="label-text text-xs">Search</span></label>
+                <input type="text" x-model="filters.search" placeholder="Search content..." class="input input-bordered input-sm bg-space-900" />
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-3">
+            <button @click="clearFilters()" class="btn btn-ghost btn-xs">Clear</button>
+            <button @click="applyFilters()" class="btn btn-primary btn-xs">Apply Filters</button>
+        </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="text-sm text-gray-400 mb-4">
+        Showing <span x-text="logs.length" class="text-white"></span> of <span x-text="total" class="text-white"></span> logs
+    </div>
+
+    <!-- Loading -->
+    <template x-if="loading">
+        <div class="flex justify-center py-12">
+            <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+    </template>
+
+    <!-- Empty State -->
+    <template x-if="!loading && logs.length === 0">
+        <div class="text-center py-12">
+            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-16 w-16 text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-300 mb-2">No Request Logs</h3>
+            <p class="text-gray-500">Request logs will appear here when API requests are made.</p>
+        </div>
+    </template>
+
+    <!-- Logs Table -->
+    <template x-if="!loading && logs.length > 0">
+        <div>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full text-sm">
+                    <thead>
+                        <tr class="text-gray-400">
+                            <th>Time</th>
+                            <th>API Key</th>
+                            <th>Model</th>
+                            <th>Tokens</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="log in logs" :key="log.id">
+                            <tr class="hover cursor-pointer" @click="viewLogDetail(log)">
+                                <td>
+                                    <div class="text-xs" x-text="formatDate(log.timestamp)"></div>
+                                </td>
+                                <td>
+                                    <div class="text-xs text-cyan-400" x-text="log.api_key_name || 'Unknown'"></div>
+                                    <div class="text-xs text-gray-500" x-text="log.api_key_prefix || ''"></div>
+                                </td>
+                                <td>
+                                    <div x-text="log.model"></div>
+                                    <div x-show="log.actual_model && log.actual_model !== log.model" class="text-xs text-gray-500" x-text="'→ ' + log.actual_model"></div>
+                                </td>
+                                <td>
+                                    <div class="text-xs">
+                                        <span class="text-gray-400">In:</span> <span x-text="log.input_tokens || 0"></span>
+                                    </div>
+                                    <div class="text-xs">
+                                        <span class="text-gray-400">Out:</span> <span x-text="log.output_tokens || 0"></span>
+                                    </div>
+                                </td>
+                                <td x-text="formatDuration(log.duration_ms)"></td>
+                                <td>
+                                    <span class="badge badge-sm" :class="getStatusBadgeClass(log.status)" x-text="log.status"></span>
+                                </td>
+                                <td>
+                                    <button @click.stop="deleteLog(log)" class="btn btn-ghost btn-xs text-red-400" title="Delete">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="flex justify-center items-center gap-2 mt-6">
+                <button @click="goToPage(1)" :disabled="page === 1" class="btn btn-ghost btn-xs">First</button>
+                <button @click="goToPage(page - 1)" :disabled="page === 1" class="btn btn-ghost btn-xs">Prev</button>
+                <span class="text-sm text-gray-400">Page <span x-text="page" class="text-white"></span> of <span x-text="pages" class="text-white"></span></span>
+                <button @click="goToPage(page + 1)" :disabled="page === pages" class="btn btn-ghost btn-xs">Next</button>
+                <button @click="goToPage(pages)" :disabled="page === pages" class="btn btn-ghost btn-xs">Last</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Detail Dialog -->
+    <dialog :open="showDetailDialog" class="modal modal-open" x-show="showDetailDialog" x-cloak>
+        <div class="modal-box bg-space-800 max-w-4xl max-h-[80vh]">
+            <template x-if="loadingDetail">
+                <div class="flex justify-center py-12">
+                    <span class="loading loading-spinner loading-lg text-primary"></span>
+                </div>
+            </template>
+
+            <template x-if="!loadingDetail && selectedLog">
+                <div>
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="font-bold text-lg text-white">Request Details</h3>
+                        <span class="badge" :class="getStatusBadgeClass(selectedLog.status)" x-text="selectedLog.status"></span>
+                    </div>
+
+                    <!-- Metadata -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
+                        <div>
+                            <div class="text-gray-400">Time</div>
+                            <div x-text="formatDate(selectedLog.timestamp)"></div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">Model</div>
+                            <div x-text="selectedLog.model"></div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">Duration</div>
+                            <div x-text="formatDuration(selectedLog.duration_ms)"></div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">Tokens</div>
+                            <div x-text="(selectedLog.input_tokens || 0) + ' in / ' + (selectedLog.output_tokens || 0) + ' out'"></div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">API Key</div>
+                            <div x-text="selectedLog.api_key_name || 'Unknown'"></div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">Account</div>
+                            <div x-text="selectedLog.account_email || '-'"></div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">Client IP</div>
+                            <div x-text="selectedLog.client_ip || '-'"></div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">HTTP Status</div>
+                            <div x-text="selectedLog.http_status || '-'"></div>
+                        </div>
+                    </div>
+
+                    <!-- Error Message -->
+                    <template x-if="selectedLog.error_message">
+                        <div class="alert alert-error mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span x-text="selectedLog.error_message"></span>
+                        </div>
+                    </template>
+
+                    <!-- System Prompt -->
+                    <template x-if="selectedLog.request_system">
+                        <div class="mb-4">
+                            <div class="text-gray-400 text-sm mb-2">System Prompt</div>
+                            <pre class="bg-space-900 rounded-lg p-3 text-xs overflow-auto max-h-32"><code x-text="selectedLog.request_system"></code></pre>
+                        </div>
+                    </template>
+
+                    <!-- Request Messages -->
+                    <div class="mb-4">
+                        <div class="text-gray-400 text-sm mb-2">Request Messages</div>
+                        <pre class="bg-space-900 rounded-lg p-3 text-xs overflow-auto max-h-48"><code x-text="formatJson(selectedLog.request_messages)"></code></pre>
+                    </div>
+
+                    <!-- Response Content -->
+                    <template x-if="selectedLog.response_content">
+                        <div class="mb-4">
+                            <div class="text-gray-400 text-sm mb-2">Response</div>
+                            <pre class="bg-space-900 rounded-lg p-3 text-xs overflow-auto max-h-48"><code x-text="formatJson(selectedLog.response_content)"></code></pre>
+                        </div>
+                    </template>
+
+                    <div class="flex justify-end">
+                        <button @click="closeDetailDialog()" class="btn btn-ghost btn-sm">Close</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <form method="dialog" class="modal-backdrop" @click="closeDetailDialog()">
+            <button>close</button>
+        </form>
+    </dialog>
+</div>

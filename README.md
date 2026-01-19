@@ -340,6 +340,8 @@ The proxy includes a built-in, modern web interface for real-time monitoring and
 - **Real-time Dashboard**: Monitor request volume, active accounts, model health, and subscription tier distribution.
 - **Visual Model Quota**: Track per-model usage and next reset times with color-coded progress indicators.
 - **Account Management**: Add/remove Google accounts via OAuth, view subscription tiers (Free/Pro/Ultra) and quota status at a glance.
+- **API Key Management**: Generate and manage API keys with advanced restrictions (model limits, rate limits, IP whitelisting, expiration).
+- **Request Logs**: Full request logging per API key with complete prompts and responses, filterable and exportable.
 - **Claude CLI Configuration**: Edit your `~/.claude/settings.json` directly from the browser.
 - **Persistent History**: Tracks request volume by model family for 30 days, persisting across server restarts.
 - **Time Range Filtering**: Analyze usage trends over 1H, 6H, 24H, 7D, or All Time periods.
@@ -347,6 +349,40 @@ The proxy includes a built-in, modern web interface for real-time monitoring and
 - **Live Logs**: Stream server logs with level-based filtering and search.
 - **Advanced Tuning**: Configure retries, timeouts, and debug mode on the fly.
 - **Bilingual Interface**: Full support for English and Chinese (switch via Settings).
+
+### API Key Management
+
+Create API keys with fine-grained access controls:
+
+```bash
+# Create key via API
+curl -X POST http://localhost:8080/api/keys \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Production Key",
+    "allowed_models": ["claude-*"],
+    "rate_limit_rpm": 60,
+    "rate_limit_rph": 1000,
+    "ip_whitelist": ["10.0.0.*"],
+    "expires_at": 1735689600
+  }'
+```
+
+**Features:**
+- **Model Restrictions**: Glob patterns (e.g., `claude-*`, `gemini-3-*`) or specific models
+- **Rate Limits**: Per-minute (RPM) and per-hour (RPH) sliding window limits
+- **IP Whitelisting**: Restrict access to specific IPs or patterns (e.g., `192.168.1.*`)
+- **Expiration**: Set automatic key expiration dates
+- **Full Logging**: Every request is logged with complete content for debugging and auditing
+
+### Request Logging
+
+View and export complete request/response history per API key:
+
+- **Full Content**: See complete prompts and responses
+- **Filtering**: Filter by API key, model, status, date range, or search content
+- **Export**: Download logs as CSV or JSON
+- **30-day Retention**: Automatic pruning of old logs
 
 ---
 
