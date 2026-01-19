@@ -137,8 +137,8 @@ window.translations.en = {
     envVar: "Env",
     // New Keys
     systemName: "ANTIGRAVITY",
-    systemDesc: "CLAUDE PROXY SYSTEM",
-    connectGoogleDesc: "Connect a Google Workspace account to increase your API quota limit. The account will be used to proxy Claude requests via Antigravity.",
+    systemDesc: "API PROXY SYSTEM",
+    connectGoogleDesc: "Connect a Google Workspace account to increase your API quota limit. The account will be used to proxy API requests via Antigravity.",
     useCliCommand: "Use CLI Command",
     close: "Close",
     requestVolume: "Request Volume",

@@ -137,8 +137,8 @@ window.translations.zh = {
     envVar: "环境变量",
     // New Keys
     systemName: "ANTIGRAVITY",
-    systemDesc: "CLAUDE 代理系统",
-    connectGoogleDesc: "连接 Google Workspace 账号以增加 API 配额。该账号将用于通过 Antigravity 代理 Claude 请求。",
+    systemDesc: "API 代理系统",
+    connectGoogleDesc: "连接 Google Workspace 账号以增加 API 配额。该账号将用于通过 Antigravity 代理 API 请求。",
     useCliCommand: "使用命令行",
     close: "关闭",
     requestVolume: "请求量",

@@ -161,8 +161,8 @@ window.translations.id = {
 
     // System
     systemName: "ANTIGRAVITY",
-    systemDesc: "CLAUDE PROXY SYSTEM",
-    connectGoogleDesc: "Hubungkan akun Google Workspace untuk meningkatkan kuota API. Akun akan digunakan untuk meneruskan request Claude via Antigravity.",
+    systemDesc: "API PROXY SYSTEM",
+    connectGoogleDesc: "Hubungkan akun Google Workspace untuk meningkatkan kuota API. Akun akan digunakan untuk meneruskan request API via Antigravity.",
     useCliCommand: "Gunakan Perintah CLI",
     close: "Tutup",
     requestVolume: "Volume Request",

@@ -119,8 +119,8 @@ window.translations.tr = {
     envVar: "Ortam Değişkeni",
     // New Keys
     systemName: "ANTIGRAVITY",
-    systemDesc: "CLAUDE PROXY SİSTEMİ",
-    connectGoogleDesc: "API kota limitinizi artırmak için bir Google Workspace hesabı bağlayın. Bu hesap, Claude isteklerini Antigravity üzerinden vekil sunucu olarak kullanmak için kullanılacaktır.",
+    systemDesc: "API PROXY SİSTEMİ",
+    connectGoogleDesc: "API kota limitinizi artırmak için bir Google Workspace hesabı bağlayın. Bu hesap, API isteklerini Antigravity üzerinden vekil sunucu olarak kullanmak için kullanılacaktır.",
     useCliCommand: "CLI Komutunu Kullan",
     close: "Kapat",
     requestVolume: "İstek Hacmi",
