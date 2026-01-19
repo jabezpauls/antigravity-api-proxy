@@ -1,11 +1,11 @@
 {
-  "name": "antigravity-claude-proxy",
-  "version": "1.2.6",
-  "description": "Proxy server to use Antigravity's Claude models with Claude Code CLI",
+  "name": "antigravity-api-proxy",
+  "version": "1.0.0",
+  "description": "Turn your Google Antigravity account into a fully functional API for Claude and Gemini models",
   "main": "src/index.js",
   "type": "module",
   "bin": {
-    "antigravity-claude-proxy": "bin/cli.js"
+    "antigravity-api-proxy": "bin/cli.js"
   },
   "files": [
     "src",
@@ -39,21 +39,15 @@
   },
   "keywords": [
     "claude",
+    "gemini",
     "anthropic",
+    "openai",
     "antigravity",
+    "api",
     "proxy",
-    "vertex-ai"
+    "llm"
   ],
-  "author": "Badri Narayanan",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/badri-s2001/antigravity-claude-proxy.git"
-  },
-  "homepage": "https://github.com/badri-s2001/antigravity-claude-proxy#readme",
-  "bugs": {
-    "url": "https://github.com/badri-s2001/antigravity-claude-proxy/issues"
-  },
   "engines": {
     "node": ">=18.0.0"
   },
