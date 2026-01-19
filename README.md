@@ -222,6 +222,8 @@ Access at `http://localhost:8080`:
 | `/health` | GET | Health check |
 | `/account-limits` | GET | Account quotas |
 
+> **Full API documentation:** See [API.md](./API.md) for detailed endpoint reference, request/response formats, code examples, and best practices.
+
 ---
 
 ## CLI Reference
@@ -287,5 +289,7 @@ MIT
 ---
 
 ## Credits
+
+Forked from [badrisnarayanan/antigravity-claude-proxy](https://github.com/badrisnarayanan/antigravity-claude-proxy).
 
 Based on [opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth) and [claude-code-proxy](https://github.com/1rgs/claude-code-proxy).
