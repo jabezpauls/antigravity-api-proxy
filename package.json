@@ -1,6 +1,6 @@
 {
-  "name": "antigravity-api-proxy",
-  "version": "1.0.0",
+  "name": "@jabezpauls/antigravity-api-proxy",
+  "version": "1.0.1",
   "description": "Turn your Google Antigravity account into a fully functional API for Claude and Gemini models",
   "main": "src/index.js",
   "type": "module",

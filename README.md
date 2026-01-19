@@ -21,13 +21,13 @@ Your App  ───▶  Antigravity API Proxy  ───▶  Google Antigravity 
 ### Option 1: npm (Recommended)
 
 ```bash
-npx antigravity-api-proxy@latest start
+npx @jabezpauls/antigravity-api-proxy@latest start
 ```
 
 ### Option 2: Clone Repository
 
 ```bash
-git clone https://github.com/badri-s2001/antigravity-api-proxy.git
+git clone https://github.com/jabezpauls/antigravity-api-proxy.git
 cd antigravity-api-proxy
 npm install
 npm start
@@ -42,7 +42,7 @@ Server runs on `http://localhost:8080`.
 ### 1. Start the Proxy
 
 ```bash
-npx antigravity-api-proxy start
+npx @jabezpauls/antigravity-api-proxy start
 ```
 
 ### 2. Add Your Google Account
@@ -51,7 +51,7 @@ Open `http://localhost:8080` in your browser, go to **Accounts**, and click **Ad
 
 Or via CLI:
 ```bash
-npx antigravity-api-proxy accounts add
+npx @jabezpauls/antigravity-api-proxy accounts add
 ```
 
 ### 3. Create an API Key
@@ -186,12 +186,12 @@ Add multiple Google accounts to increase your API throughput. The proxy automati
 
 ```bash
 # Add more accounts
-npx antigravity-api-proxy accounts add
+npx @jabezpauls/antigravity-api-proxy accounts add
 
 # Choose load balancing strategy
-npx antigravity-api-proxy start --strategy=round-robin  # Rotate each request
-npx antigravity-api-proxy start --strategy=sticky       # Stay on one account
-npx antigravity-api-proxy start --strategy=hybrid       # Smart selection (default)
+npx @jabezpauls/antigravity-api-proxy start --strategy=round-robin  # Rotate each request
+npx @jabezpauls/antigravity-api-proxy start --strategy=sticky       # Stay on one account
+npx @jabezpauls/antigravity-api-proxy start --strategy=hybrid       # Smart selection (default)
 ```
 
 ---
@@ -230,16 +230,16 @@ Access at `http://localhost:8080`:
 
 ```bash
 # Start server
-npx antigravity-api-proxy start
-npx antigravity-api-proxy start --strategy=sticky
-npx antigravity-api-proxy start --debug
+npx @jabezpauls/antigravity-api-proxy start
+npx @jabezpauls/antigravity-api-proxy start --strategy=sticky
+npx @jabezpauls/antigravity-api-proxy start --debug
 
 # Manage accounts
-npx antigravity-api-proxy accounts           # Interactive menu
-npx antigravity-api-proxy accounts add       # Add account
-npx antigravity-api-proxy accounts add --no-browser  # Headless mode
-npx antigravity-api-proxy accounts list      # List accounts
-npx antigravity-api-proxy accounts verify    # Check token validity
+npx @jabezpauls/antigravity-api-proxy accounts           # Interactive menu
+npx @jabezpauls/antigravity-api-proxy accounts add       # Add account
+npx @jabezpauls/antigravity-api-proxy accounts add --no-browser  # Headless mode
+npx @jabezpauls/antigravity-api-proxy accounts list      # List accounts
+npx @jabezpauls/antigravity-api-proxy accounts verify    # Check token validity
 ```
 
 ---
@@ -257,7 +257,7 @@ npx antigravity-api-proxy accounts verify    # Check token validity
 ## Troubleshooting
 
 **Can't connect:**
-- Make sure the proxy is running: `npx antigravity-api-proxy start`
+- Make sure the proxy is running: `npx @jabezpauls/antigravity-api-proxy start`
 - Check health: `curl http://localhost:8080/health`
 
 **401 Unauthorized:**

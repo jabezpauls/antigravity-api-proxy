@@ -1086,10 +1086,10 @@ For high throughput:
 
 ```bash
 # Add multiple accounts
-npx antigravity-api-proxy accounts add  # Repeat for each account
+npx @jabezpauls/antigravity-api-proxy accounts add  # Repeat for each account
 
 # Use round-robin for max throughput
-npx antigravity-api-proxy start --strategy=round-robin
+npx @jabezpauls/antigravity-api-proxy start --strategy=round-robin
 ```
 
 ### 8. Caching Considerations
