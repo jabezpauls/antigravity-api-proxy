@@ -11,7 +11,6 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('dashboard', window.Components.dashboard);
     Alpine.data('models', window.Components.models);
     Alpine.data('accountManager', window.Components.accountManager);
-    Alpine.data('claudeConfig', window.Components.claudeConfig);
     Alpine.data('logsViewer', window.Components.logsViewer);
     Alpine.data('apiKeys', window.Components.apiKeys);
     Alpine.data('requestLogs', window.Components.requestLogs);
