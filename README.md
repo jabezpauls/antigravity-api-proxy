@@ -1,85 +1,65 @@
-# Antigravity Claude Proxy
+# Antigravity API Proxy
 
-A proxy server that lets you use **Claude** and **Gemini** models with any OpenAI/Anthropic-compatible client through Google's Antigravity Cloud Code API.
+Turn your Google Antigravity account into a fully functional API. Use Claude and Gemini models with any application that supports OpenAI or Anthropic APIs.
 
 ```
-Your App  ───▶  This Proxy (localhost:8080)  ───▶  Google Cloud Code API
+Your App  ───▶  Antigravity API Proxy  ───▶  Google Antigravity (Cloud Code)
+                 (localhost:8080)
 ```
+
+**What it does:**
+- Connects to Google Antigravity using your Google account
+- Exposes OpenAI and Anthropic compatible API endpoints
+- Generates API keys you can use in any app (Cursor, Continue, LangChain, etc.)
+- Manages multiple accounts for higher throughput
+- Logs all requests with full prompts and responses
+
+---
 
 ## Installation
 
 ### Option 1: npm (Recommended)
 
 ```bash
-npx antigravity-claude-proxy@latest start
+npx antigravity-api-proxy@latest start
 ```
 
 ### Option 2: Clone Repository
 
 ```bash
-git clone https://github.com/badri-s2001/antigravity-claude-proxy.git
-cd antigravity-claude-proxy
+git clone https://github.com/badri-s2001/antigravity-api-proxy.git
+cd antigravity-api-proxy
 npm install
 npm start
 ```
 
-Server runs on `http://localhost:8080` by default.
+Server runs on `http://localhost:8080`.
 
 ---
 
-## Setup
+## Quick Start
 
-### 1. Add a Google Account
-
-**Via Web Dashboard:**
-1. Open `http://localhost:8080`
-2. Click **Accounts** → **Add Account**
-3. Complete Google OAuth in the popup
-
-**Via CLI:**
-```bash
-# Desktop (opens browser)
-npx antigravity-claude-proxy accounts add
-
-# Headless/SSH (manual code entry)
-npx antigravity-claude-proxy accounts add --no-browser
-```
-
-### 2. Verify Setup
+### 1. Start the Proxy
 
 ```bash
-curl http://localhost:8080/health
-curl "http://localhost:8080/account-limits?format=table"
+npx antigravity-api-proxy start
 ```
 
----
+### 2. Add Your Google Account
 
-## Usage
+Open `http://localhost:8080` in your browser, go to **Accounts**, and click **Add Account**. Complete the Google OAuth flow.
 
-### With Claude Code CLI
-
-Edit `~/.claude/settings.json`:
-
-```json
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "http://localhost:8080",
-    "ANTHROPIC_AUTH_TOKEN": "any-value",
-    "ANTHROPIC_MODEL": "gemini-3-flash"
-  }
-}
-```
-
-Then run:
+Or via CLI:
 ```bash
-claude
+npx antigravity-api-proxy accounts add
 ```
 
-### With API Keys
+### 3. Create an API Key
 
-Create an API key via the Web UI (`http://localhost:8080` → **API Keys** → **Create Key**), then use it:
+Go to **API Keys** → **Create Key**. Copy the generated key (starts with `sk-ag-`).
 
-**curl (OpenAI format):**
+### 4. Use the API
+
 ```bash
 curl http://localhost:8080/v1/chat/completions \
   -H "Authorization: Bearer sk-ag-your-key-here" \
@@ -87,16 +67,12 @@ curl http://localhost:8080/v1/chat/completions \
   -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "Hello!"}]}'
 ```
 
-**curl (Anthropic format):**
-```bash
-curl http://localhost:8080/v1/messages \
-  -H "x-api-key: sk-ag-your-key-here" \
-  -H "Content-Type: application/json" \
-  -H "anthropic-version: 2023-06-01" \
-  -d '{"model": "gemini-3-flash", "max_tokens": 1024, "messages": [{"role": "user", "content": "Hello!"}]}'
-```
+---
 
-**Python (OpenAI SDK):**
+## Usage Examples
+
+### OpenAI SDK (Python)
+
 ```python
 from openai import OpenAI
 
@@ -112,7 +88,8 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-**Python (Anthropic SDK):**
+### Anthropic SDK (Python)
+
 ```python
 import anthropic
 
@@ -129,30 +106,51 @@ response = client.messages.create(
 print(response.content[0].text)
 ```
 
+### Claude Code CLI
+
+Edit `~/.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:8080",
+    "ANTHROPIC_AUTH_TOKEN": "sk-ag-your-key-here",
+    "ANTHROPIC_MODEL": "gemini-3-flash"
+  }
+}
+```
+
+### Cursor / Continue / Other Apps
+
+Set these in your app's settings:
+- **API Base URL**: `http://localhost:8080/v1`
+- **API Key**: `sk-ag-your-key-here`
+- **Model**: `gpt-4` or any model from the list below
+
 ---
 
 ## Available Models
+
+### Gemini Models
+| Model | Description |
+|-------|-------------|
+| `gemini-3-flash` | Fast, good for most tasks |
+| `gemini-3-pro-low` | Pro quality, lower quota usage |
+| `gemini-3-pro-high` | Pro quality, higher limits |
+| `gemini-2.5-flash` | Gemini 2.5 Flash |
+| `gemini-2.5-flash-lite` | Cheapest option |
+| `gemini-2.5-pro` | Gemini 2.5 Pro |
 
 ### Claude Models
 | Model | Description |
 |-------|-------------|
 | `claude-sonnet-4-5` | Claude Sonnet 4.5 |
-| `claude-sonnet-4-5-thinking` | Claude Sonnet 4.5 with extended thinking |
-| `claude-opus-4-5-thinking` | Claude Opus 4.5 with extended thinking |
+| `claude-sonnet-4-5-thinking` | With extended thinking |
+| `claude-opus-4-5-thinking` | Claude Opus with thinking |
 
-### Gemini Models
-| Model | Description |
-|-------|-------------|
-| `gemini-3-flash` | Gemini 3 Flash (fast) |
-| `gemini-3-pro-low` | Gemini 3 Pro Low |
-| `gemini-3-pro-high` | Gemini 3 Pro High |
-| `gemini-2.5-flash` | Gemini 2.5 Flash |
-| `gemini-2.5-flash-lite` | Gemini 2.5 Flash Lite (cheapest) |
-| `gemini-2.5-pro` | Gemini 2.5 Pro |
-
-### OpenAI Model Mapping
-| OpenAI Name | Maps To |
-|-------------|---------|
+### OpenAI Model Names (Auto-mapped)
+| Use This | Gets You |
+|----------|----------|
 | `gpt-4` | `claude-opus-4-5-thinking` |
 | `gpt-4o` | `gemini-3-pro-high` |
 | `gpt-3.5-turbo` | `gemini-3-flash` |
@@ -161,53 +159,40 @@ print(response.content[0].text)
 
 ## API Key Features
 
-Create keys with restrictions via Web UI or API:
+Create keys with restrictions:
 
+- **Model Restrictions**: Allow only specific models (`gemini-*`, `claude-*`)
+- **Rate Limits**: Set requests per minute/hour
+- **IP Whitelisting**: Restrict to specific IPs
+- **Expiration**: Auto-expire keys on a date
+- **Request Logging**: Full prompt/response history per key
+
+Create via Web UI or API:
 ```bash
 curl -X POST http://localhost:8080/api/keys \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "My Key",
+    "name": "My App Key",
     "allowed_models": ["gemini-*"],
-    "rate_limit_rpm": 60,
-    "ip_whitelist": ["192.168.1.*"],
-    "expires_at": 1735689600
+    "rate_limit_rpm": 60
   }'
 ```
-
-**Features:**
-- **Model Restrictions**: Glob patterns (`claude-*`, `gemini-3-*`)
-- **Rate Limits**: Per-minute and per-hour limits
-- **IP Whitelisting**: Restrict by IP patterns
-- **Expiration**: Auto-expire keys
-- **Request Logging**: Full prompt/response logging per key
 
 ---
 
 ## Multi-Account Support
 
-Add multiple Google accounts for higher throughput. The proxy auto-switches when one is rate-limited.
+Add multiple Google accounts to increase your API throughput. The proxy automatically switches accounts when one hits rate limits.
 
-**Strategies:**
 ```bash
-npx antigravity-claude-proxy start --strategy=round-robin  # Rotate every request
-npx antigravity-claude-proxy start --strategy=sticky       # Stay on one account (better caching)
-npx antigravity-claude-proxy start --strategy=hybrid       # Smart selection (default)
+# Add more accounts
+npx antigravity-api-proxy accounts add
+
+# Choose load balancing strategy
+npx antigravity-api-proxy start --strategy=round-robin  # Rotate each request
+npx antigravity-api-proxy start --strategy=sticky       # Stay on one account
+npx antigravity-api-proxy start --strategy=hybrid       # Smart selection (default)
 ```
-
----
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/v1/chat/completions` | POST | OpenAI-compatible chat |
-| `/v1/messages` | POST | Anthropic-compatible messages |
-| `/v1/models` | GET | List models |
-| `/account-limits` | GET | Account status and quotas |
-| `/api/keys` | GET/POST | API key management |
-| `/api/logs/requests` | GET | Request logs |
 
 ---
 
@@ -215,27 +200,44 @@ npx antigravity-claude-proxy start --strategy=hybrid       # Smart selection (de
 
 Access at `http://localhost:8080`:
 
-- **Dashboard**: Real-time stats, quota tracking
-- **Accounts**: Add/remove Google accounts
-- **API Keys**: Create and manage API keys with restrictions
-- **Request Logs**: View full request/response history
-- **Settings**: Configure server and Claude CLI
+| Tab | What It Does |
+|-----|--------------|
+| **Dashboard** | Real-time stats, quota usage |
+| **Accounts** | Add/remove Google accounts |
+| **API Keys** | Create and manage API keys |
+| **Request Logs** | View all requests with full content |
+| **Settings** | Server configuration |
 
 ---
 
-## CLI Commands
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/chat/completions` | POST | OpenAI-compatible chat |
+| `/v1/messages` | POST | Anthropic-compatible messages |
+| `/v1/models` | GET | List available models |
+| `/api/keys` | GET/POST | Manage API keys |
+| `/api/logs/requests` | GET | View request logs |
+| `/health` | GET | Health check |
+| `/account-limits` | GET | Account quotas |
+
+---
+
+## CLI Reference
 
 ```bash
 # Start server
-npx antigravity-claude-proxy start
-npx antigravity-claude-proxy start --strategy=sticky
-npx antigravity-claude-proxy start --debug
+npx antigravity-api-proxy start
+npx antigravity-api-proxy start --strategy=sticky
+npx antigravity-api-proxy start --debug
 
-# Account management
-npx antigravity-claude-proxy accounts           # Interactive menu
-npx antigravity-claude-proxy accounts add       # Add account
-npx antigravity-claude-proxy accounts list      # List accounts
-npx antigravity-claude-proxy accounts verify    # Verify tokens
+# Manage accounts
+npx antigravity-api-proxy accounts           # Interactive menu
+npx antigravity-api-proxy accounts add       # Add account
+npx antigravity-api-proxy accounts add --no-browser  # Headless mode
+npx antigravity-api-proxy accounts list      # List accounts
+npx antigravity-api-proxy accounts verify    # Check token validity
 ```
 
 ---
@@ -252,26 +254,29 @@ npx antigravity-claude-proxy accounts verify    # Verify tokens
 
 ## Troubleshooting
 
-**401 Authentication Error:**
-```bash
-curl -X POST http://localhost:8080/refresh-token
-```
+**Can't connect:**
+- Make sure the proxy is running: `npx antigravity-api-proxy start`
+- Check health: `curl http://localhost:8080/health`
 
-**Rate Limited (429):**
-- Add more accounts, or wait for reset
+**401 Unauthorized:**
+- Your Google token may have expired
+- Re-add your account or refresh: `curl -X POST http://localhost:8080/refresh-token`
+
+**429 Rate Limited:**
+- Add more Google accounts for higher limits
 - Check quotas: `curl "http://localhost:8080/account-limits?format=table"`
 
-**Account Invalid:**
-- Re-authenticate via Web UI or CLI
+**Model not allowed:**
+- Check your API key's allowed models in the Web UI
 
 ---
 
 ## Risk Notice
 
-- This project is **not affiliated with Google or Anthropic**
+- **Not affiliated with Google or Anthropic**
 - May violate Terms of Service - use at your own risk
-- Intended for personal/development use only
-- Accounts may be suspended - you assume all risk
+- For personal/development use only
+- Your account could be suspended
 
 ---
 
