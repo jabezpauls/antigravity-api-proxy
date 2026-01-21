@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+tests/
+*.test.js
+*.test.cjs
+coverage/
+
+# Documentation (not needed in container)
+*.md
+!README.md
+docs/
+
+# Local config (will be mounted as volume)
+config.json
+accounts.json
+
+# Build artifacts
+.nyc_output/
+dist/
+
+# Docker files (not needed inside image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Environment files
+.env
+.env.*
+
+# Temporary files
+tmp/
+temp/
+*.tmp

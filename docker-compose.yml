@@ -1,0 +1,32 @@
+services:
+  antigravity-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: antigravity-api-proxy:latest
+    container_name: antigravity-proxy
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      # Persistent storage for accounts, config, and database
+      - antigravity-data:/home/appuser/.config/antigravity-proxy
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      # Optional: Set a password to protect the web UI
+      # - WEBUI_PASSWORD=your-secret-password
+      # Optional: Enable debug logging
+      # - DEBUG=true
+      # Optional: Account selection strategy (sticky, round-robin, hybrid)
+      # - ACCOUNT_STRATEGY=hybrid
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  antigravity-data:
+    driver: local

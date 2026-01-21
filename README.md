@@ -33,6 +33,43 @@ npm install
 npm start
 ```
 
+### Option 3: Docker
+
+```bash
+git clone https://github.com/jabezpauls/antigravity-api-proxy.git
+cd antigravity-api-proxy
+docker compose up -d
+```
+
+**Docker commands:**
+```bash
+# Start the proxy
+docker compose up -d
+
+# View logs
+docker logs -f antigravity-proxy
+
+# Stop the proxy
+docker compose down
+
+# Restart
+docker compose restart
+```
+
+**Environment variables** (set in `docker-compose.yml`):
+```yaml
+environment:
+  - PORT=8080
+  - WEBUI_PASSWORD=your-secret-password  # Optional: protect Web UI
+  - DEBUG=true                            # Optional: enable debug logging
+  - ACCOUNT_STRATEGY=hybrid               # Optional: sticky, round-robin, hybrid
+```
+
+**Data persistence:** Account data is stored in a Docker volume (`antigravity-data`). To backup:
+```bash
+docker cp antigravity-proxy:/home/appuser/.config/antigravity-proxy/accounts.json ./backup/
+```
+
 Server runs on `http://localhost:8080`.
 
 ---
