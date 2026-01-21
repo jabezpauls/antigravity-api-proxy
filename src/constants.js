@@ -170,6 +170,17 @@ export function isThinkingModel(modelName) {
     return false;
 }
 
+/**
+ * Check if a model supports image generation output.
+ * @param {string} modelName - The model name from the request
+ * @returns {boolean} True if the model supports image generation
+ */
+export function isImageModel(modelName) {
+    const lower = (modelName || '').toLowerCase();
+    // Models with "image" in the name support image generation
+    return lower.includes('image');
+}
+
 // Google OAuth configuration (from opencode-antigravity-auth)
 export const OAUTH_CONFIG = {
     clientId: '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com',

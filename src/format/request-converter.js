@@ -6,7 +6,8 @@
 import {
     GEMINI_MAX_OUTPUT_TOKENS,
     getModelFamily,
-    isThinkingModel
+    isThinkingModel,
+    isImageModel
 } from '../constants.js';
 import { convertContentToParts, convertRole } from './content-converter.js';
 import { sanitizeSchema, cleanSchema } from './schema-sanitizer.js';
@@ -148,6 +149,13 @@ export function convertAnthropicToGoogle(anthropicRequest) {
     }
     if (stop_sequences && stop_sequences.length > 0) {
         googleRequest.generationConfig.stopSequences = stop_sequences;
+    }
+
+    // Enable image generation for image models (e.g., gemini-3-pro-image)
+    const isImage = isImageModel(modelName);
+    if (isImage && isGeminiModel) {
+        googleRequest.generationConfig.responseModalities = ['TEXT', 'IMAGE'];
+        logger.debug('[RequestConverter] Image generation enabled (responseModalities: TEXT, IMAGE)');
     }
 
     // Enable thinking for thinking models (Claude and Gemini 3+)
