@@ -59,6 +59,9 @@ try {
 // Maps state ID to active OAuth flow data
 const pendingOAuthFlows = new Map();
 
+// Track active OAuth callback server to prevent port conflicts
+let activeOAuthServer = null;
+
 /**
  * WebUI Helper Functions - Direct account manipulation
  * These functions work around AccountManager's limited API by directly
@@ -890,10 +893,25 @@ export function mountWebUI(app, dirname, accountManager) {
      */
     app.get('/api/auth/url', async (req, res) => {
         try {
+            // Close any existing OAuth server to prevent port conflicts
+            if (activeOAuthServer) {
+                try {
+                    logger.info('[WebUI] Closing existing OAuth callback server...');
+                    activeOAuthServer.close();
+                    activeOAuthServer = null;
+                } catch (e) {
+                    // Ignore errors when closing - server may already be closed
+                }
+            }
+
             // Clean up old flows (> 10 mins)
             const now = Date.now();
             for (const [key, val] of pendingOAuthFlows.entries()) {
                 if (now - val.timestamp > 10 * 60 * 1000) {
+                    // Also try to close the server if it exists
+                    if (val.server) {
+                        try { val.server.close(); } catch (e) { /* ignore */ }
+                    }
                     pendingOAuthFlows.delete(key);
                 }
             }
@@ -902,11 +920,15 @@ export function mountWebUI(app, dirname, accountManager) {
             const { url, verifier, state } = getAuthorizationUrl();
 
             // Start callback server on port 51121 (same as CLI)
-            const serverPromise = startCallbackServer(state, 120000); // 2 min timeout
+            const { promise: serverPromise, server } = startCallbackServer(state, 120000); // 2 min timeout
+
+            // Track the active server globally
+            activeOAuthServer = server;
 
             // Store the flow data
             pendingOAuthFlows.set(state, {
                 serverPromise,
+                server,
                 verifier,
                 state,
                 timestamp: Date.now()
@@ -936,11 +958,13 @@ export function mountWebUI(app, dirname, accountManager) {
                         logger.error('[WebUI] OAuth flow completion error:', err);
                     } finally {
                         pendingOAuthFlows.delete(state);
+                        activeOAuthServer = null;
                     }
                 })
                 .catch((err) => {
                     logger.error('[WebUI] OAuth callback server error:', err);
                     pendingOAuthFlows.delete(state);
+                    activeOAuthServer = null;
                 });
 
             res.json({ status: 'ok', url });

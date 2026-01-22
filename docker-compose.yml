@@ -8,9 +8,11 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:-8080}:8080"
+      - "61121:61121"  # OAuth callback port for adding accounts
     volumes:
-      # Persistent storage for accounts, config, and database
-      - antigravity-data:/home/appuser/.config/antigravity-proxy
+      # Mount local config directory so accounts added via CLI are available in Docker
+      # On Windows: C:\Users\<username>\.config\antigravity-proxy
+      - ${USERPROFILE}/.config/antigravity-proxy:/home/appuser/.config/antigravity-proxy
     environment:
       - NODE_ENV=production
       - PORT=8080

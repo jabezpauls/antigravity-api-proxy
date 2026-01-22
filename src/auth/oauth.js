@@ -139,15 +139,19 @@ export function extractCodeFromInput(input) {
 
 /**
  * Start a local server to receive the OAuth callback
- * Returns a promise that resolves with the authorization code
+ * Returns an object with the promise that resolves with the authorization code
+ * and a reference to the server (for cleanup if needed)
  *
  * @param {string} expectedState - Expected state parameter for CSRF protection
  * @param {number} timeoutMs - Timeout in milliseconds (default 120000)
- * @returns {Promise<string>} Authorization code from OAuth callback
+ * @returns {{promise: Promise<string>, server: http.Server}} Object with promise for auth code and server reference
  */
 export function startCallbackServer(expectedState, timeoutMs = 120000) {
-    return new Promise((resolve, reject) => {
-        const server = http.createServer((req, res) => {
+    let server;
+    let timeoutId;
+
+    const promise = new Promise((resolve, reject) => {
+        server = http.createServer((req, res) => {
             const url = new URL(req.url, `http://localhost:${OAUTH_CONFIG.callbackPort}`);
 
             if (url.pathname !== '/oauth-callback') {
@@ -172,6 +176,7 @@ export function startCallbackServer(expectedState, timeoutMs = 120000) {
                     </body>
                     </html>
                 `);
+                clearTimeout(timeoutId);
                 server.close();
                 reject(new Error(`OAuth error: ${error}`));
                 return;
@@ -189,6 +194,7 @@ export function startCallbackServer(expectedState, timeoutMs = 120000) {
                     </body>
                     </html>
                 `);
+                clearTimeout(timeoutId);
                 server.close();
                 reject(new Error('State mismatch'));
                 return;
@@ -206,6 +212,7 @@ export function startCallbackServer(expectedState, timeoutMs = 120000) {
                     </body>
                     </html>
                 `);
+                clearTimeout(timeoutId);
                 server.close();
                 reject(new Error('No authorization code'));
                 return;
@@ -224,11 +231,13 @@ export function startCallbackServer(expectedState, timeoutMs = 120000) {
                 </html>
             `);
 
+            clearTimeout(timeoutId);
             server.close();
             resolve(code);
         });
 
         server.on('error', (err) => {
+            clearTimeout(timeoutId);
             if (err.code === 'EADDRINUSE') {
                 reject(new Error(`Port ${OAUTH_CONFIG.callbackPort} is already in use. Close any other OAuth flows and try again.`));
             } else {
@@ -241,11 +250,13 @@ export function startCallbackServer(expectedState, timeoutMs = 120000) {
         });
 
         // Timeout after specified duration
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
             server.close();
             reject(new Error('OAuth callback timeout - no response received'));
         }, timeoutMs);
     });
+
+    return { promise, server };
 }
 
 /**
