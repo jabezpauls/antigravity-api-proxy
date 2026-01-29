@@ -225,7 +225,7 @@ export async function discoverProject(token, projectId = undefined) {
     // Reference: opencode-antigravity-auth/src/plugin/project.ts buildMetadata()
     const projectIdForLoad = projectId ?? DEFAULT_PROJECT_ID;
     const metadata = {
-        ideType: 'IDE_UNSPECIFIED',
+        ideType: 'ANTIGRAVITY',
         platform: 'PLATFORM_UNSPECIFIED',
         pluginType: 'GEMINI'
     };

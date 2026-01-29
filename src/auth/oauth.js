@@ -372,7 +372,7 @@ export async function discoverProjectId(accessToken) {
                 },
                 body: JSON.stringify({
                     metadata: {
-                        ideType: 'IDE_UNSPECIFIED',
+                        ideType: 'ANTIGRAVITY',
                         platform: 'PLATFORM_UNSPECIFIED',
                         pluginType: 'GEMINI'
                     }

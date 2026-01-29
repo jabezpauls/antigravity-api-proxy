@@ -33,7 +33,7 @@ function getAntigravityDbPath() {
 function getPlatformUserAgent() {
     const os = platform();
     const architecture = arch();
-    return `antigravity/1.11.5 ${os}/${architecture}`;
+    return `antigravity/1.15.8 ${os}/${architecture}`;
 }
 
 // Cloud Code API endpoints (in fallback order)
@@ -49,9 +49,9 @@ export const ANTIGRAVITY_ENDPOINT_FALLBACKS = [
 // Required headers for Antigravity API requests
 export const ANTIGRAVITY_HEADERS = {
     'User-Agent': getPlatformUserAgent(),
-    'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
+    'X-Goog-Api-Client': 'google-cloud-sdk antigravity/1.15.8',
     'Client-Metadata': JSON.stringify({
-        ideType: 'IDE_UNSPECIFIED',
+        ideType: 'ANTIGRAVITY',
         platform: 'PLATFORM_UNSPECIFIED',
         pluginType: 'GEMINI'
     })

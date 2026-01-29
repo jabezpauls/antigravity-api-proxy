@@ -170,7 +170,7 @@ export async function getSubscriptionTier(token) {
                 headers,
                 body: JSON.stringify({
                     metadata: {
-                        ideType: 'IDE_UNSPECIFIED',
+                        ideType: 'ANTIGRAVITY',
                         platform: 'PLATFORM_UNSPECIFIED',
                         pluginType: 'GEMINI',
                         duetProject: 'rising-fact-p41fc'

@@ -45,7 +45,7 @@ export function getDefaultTierId(allowedTiers) {
  */
 export async function onboardUser(token, tierId, projectId = undefined, maxAttempts = 10, delayMs = 5000) {
     const metadata = {
-        ideType: 'IDE_UNSPECIFIED',
+        ideType: 'ANTIGRAVITY',
         platform: 'PLATFORM_UNSPECIFIED',
         pluginType: 'GEMINI'
     };

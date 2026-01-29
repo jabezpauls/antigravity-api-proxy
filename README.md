@@ -195,18 +195,18 @@ print(response.content)
 Generate images using the `gemini-3-pro-image` model:
 
 ```bash
-curl http://localhost:8080/v1/messages \
-  -H "Authorization: Bearer sk-ag-your-key-here" \
+# Generate and save directly to file
+curl -s -X POST http://localhost:8080/v1/messages \
+  -H "x-api-key: sk-ag-your-key-here" \
   -H "Content-Type: application/json" \
-  -H "anthropic-version: 2023-06-01" \
   -d '{
     "model": "gemini-3-pro-image",
     "max_tokens": 4096,
-    "messages": [{"role": "user", "content": "Generate an image of a sunset over mountains"}]
-  }'
+    "messages": [{"role": "user", "content": "Generate an image of a cat wearing sunglasses"}]
+  }' | jq -r '.content[] | select(.type=="image") | .source.data' | base64 -d > cat.jpg
 ```
 
-The response includes base64-encoded image data in the `content` array.
+The response includes base64-encoded image data in the `content` array as `image` blocks.
 
 ---
 

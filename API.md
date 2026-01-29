@@ -9,6 +9,7 @@ Complete reference for all API endpoints, authentication, and usage patterns.
 - [Authentication](#authentication)
 - [Chat Completions (OpenAI Format)](#chat-completions-openai-format)
 - [Messages (Anthropic Format)](#messages-anthropic-format)
+- [Image Generation](#image-generation)
 - [Models](#models)
 - [API Keys Management](#api-keys-management)
 - [Request Logs](#request-logs)
@@ -352,6 +353,67 @@ response = client.messages.create(
 # Response: "Your name is Alice."
 ```
 
+### Image Generation
+
+Generate images using the `gemini-3-pro-image` model. Images are returned as base64-encoded data in the response.
+
+**Generate and save an image:**
+
+```bash
+curl -s -X POST http://localhost:8080/v1/messages \
+  -H "x-api-key: sk-ag-your-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-3-pro-image",
+    "max_tokens": 4096,
+    "messages": [{"role": "user", "content": "Generate an image of a cat wearing sunglasses"}]
+  }' | jq -r '.content[] | select(.type=="image") | .source.data' | base64 -d > cat.jpg
+```
+
+**Response structure:**
+
+```json
+{
+  "id": "msg_abc123",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "Here's an image of a cat wearing sunglasses:"
+    },
+    {
+      "type": "image",
+      "source": {
+        "type": "base64",
+        "media_type": "image/jpeg",
+        "data": "base64-encoded-image-data..."
+      }
+    }
+  ],
+  "model": "gemini-3-pro-image",
+  "stop_reason": "end_turn"
+}
+```
+
+**Python example:**
+
+```python
+import base64
+
+response = client.messages.create(
+    model="gemini-3-pro-image",
+    max_tokens=4096,
+    messages=[{"role": "user", "content": "Generate an image of a sunset over mountains"}]
+)
+
+for block in response.content:
+    if block.type == "image":
+        image_data = base64.b64decode(block.source.data)
+        with open("sunset.jpg", "wb") as f:
+            f.write(image_data)
+```
+
 ---
 
 ## Models
@@ -393,6 +455,7 @@ curl http://localhost:8080/v1/models \
 | `gemini-2.5-flash` | Google | Gemini 2.5 | Balanced performance |
 | `gemini-2.5-flash-lite` | Google | Lightweight | High volume, low cost |
 | `gemini-2.5-pro` | Google | Premium | Best quality |
+| `gemini-3-pro-image` | Google | Image generation | Creating images from text |
 | `claude-sonnet-4-5` | Anthropic | Claude Sonnet | Coding, analysis |
 | `claude-sonnet-4-5-thinking` | Anthropic | With thinking | Complex reasoning |
 | `claude-opus-4-5-thinking` | Anthropic | Claude Opus | Most capable |
@@ -1022,6 +1085,7 @@ def request_with_retry(func, max_retries=3):
 | Code generation | `claude-sonnet-4-5` |
 | Complex reasoning | `claude-opus-4-5-thinking` |
 | High volume, low cost | `gemini-2.5-flash-lite` |
+| Image generation | `gemini-3-pro-image` |
 
 ### 2. Optimize Token Usage
 

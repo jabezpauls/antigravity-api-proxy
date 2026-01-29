@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Antigravity Claude Proxy is a Node.js proxy server that exposes an Anthropic-compatible API backed by Antigravity's Cloud Code service. It enables using Claude models (`claude-sonnet-4-5-thinking`, `claude-opus-4-5-thinking`) and Gemini models (`gemini-3-flash`, `gemini-3-pro-low`, `gemini-3-pro-high`) with Claude Code CLI.
+Antigravity Claude Proxy is a Node.js proxy server that exposes an Anthropic-compatible API backed by Antigravity's Cloud Code service. It enables using Claude models (`claude-sonnet-4-5-thinking`, `claude-opus-4-5-thinking`), Gemini models (`gemini-3-flash`, `gemini-3-pro-low`, `gemini-3-pro-high`), and image generation (`gemini-3-pro-image`) with Claude Code CLI.
 
 The proxy translates requests from Anthropic Messages API format → Google Generative AI format → Antigravity Cloud Code API, then converts responses back to Anthropic format with full thinking/streaming support.
 
@@ -191,7 +191,7 @@ public/
 - **src/account-manager/**: Multi-account pool with configurable selection strategies, rate limit handling, and automatic cooldown
   - Strategies: `sticky` (cache-optimized), `round-robin` (load-balanced), `hybrid` (smart distribution)
 - **src/auth/**: Authentication including Google OAuth, token extraction, database access, and auto-rebuild of native modules
-- **src/format/**: Format conversion between Anthropic and Google Generative AI formats
+- **src/format/**: Format conversion between Anthropic and Google Generative AI formats (text, images, tools, thinking)
   - **src/format/openai/**: OpenAI API compatibility layer
     - `model-mapper.js`: Maps OpenAI model names (gpt-4, etc.) to internal models
     - `request-converter.js`: Converts OpenAI Chat Completions → Anthropic format
@@ -312,7 +312,7 @@ Each account object in `accounts.json` contains:
 
 **Constants:** All configuration values are centralized in `src/constants.js`:
 - API endpoints and headers
-- Model mappings and model family detection (`getModelFamily()`, `isThinkingModel()`)
+- Model mappings and model family detection (`getModelFamily()`, `isThinkingModel()`, `isImageModel()`)
 - Model fallback mappings (`MODEL_FALLBACK_MAP`)
 - OAuth configuration
 - Rate limit thresholds
@@ -320,8 +320,10 @@ Each account object in `accounts.json` contains:
 
 **Model Family Handling:**
 - `getModelFamily(model)` returns `'claude'` or `'gemini'` based on model name
+- `isImageModel(model)` detects image generation models (names containing "image")
 - Claude models use `signature` field on thinking blocks
 - Gemini models use `thoughtSignature` field on functionCall parts (cached or sentinel value)
+- Image models automatically enable `responseModalities: ['TEXT', 'IMAGE']` in requests
 - When Claude Code strips `thoughtSignature`, the proxy tries to restore from cache, then falls back to `skip_thought_signature_validator`
 
 **Error Handling:** Use custom error classes from `src/errors.js`:
